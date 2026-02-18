@@ -1317,7 +1317,7 @@ class SistemaControlAccesoPostgreSQL:
         label_hora_entrada.pack(fill='x', pady=3)
         
         # Variable para guardar datos del visitante
-        datos_visitante = {'id': None, 'parqueadero_id': None, 'placa': ''}
+        datos_visitante = {'id': None, 'parqueadero_id': None, 'placa': '', 'parqueadero': None}
         tarifa_calculada = {'valor': 0}
         
         def calcular_tarifa():
@@ -1330,6 +1330,8 @@ class SistemaControlAccesoPostgreSQL:
                 label_calculo_tipo.config(text="📌 Tipo de tarifa: --")
                 label_hora_entrada.config(text="🕐 Hora entrada: --")
                 datos_visitante['id'] = None
+                datos_visitante['parqueadero_id'] = None
+                datos_visitante['parqueadero'] = None
                 return
             
             if self.usar_datos_memoria:
@@ -1340,6 +1342,7 @@ class SistemaControlAccesoPostgreSQL:
                     
                     datos_visitante['placa'] = placa
                     datos_visitante['parqueadero'] = parqueadero
+                    datos_visitante['id'] = placa  # Usamos la placa como ID en modo memoria
                     
                     tiempo = hora_salida - hora_entrada
                     horas = tiempo.total_seconds() / 3600
@@ -1366,6 +1369,7 @@ class SistemaControlAccesoPostgreSQL:
                     label_hora_entrada.config(text="🕐 Hora entrada: --")
                     tarifa_calculada['valor'] = 0
                     datos_visitante['id'] = None
+                    datos_visitante['parqueadero'] = None
             else:
                 if self.db and self.db.conectado:
                     visitante = self.db.obtener_visitante_activo_por_placa(placa)
@@ -1414,6 +1418,7 @@ class SistemaControlAccesoPostgreSQL:
                         label_hora_entrada.config(text="🕐 Hora entrada: --")
                         tarifa_calculada['valor'] = 0
                         datos_visitante['id'] = None
+                        datos_visitante['parqueadero_id'] = None
         
         # Bind para calcular cuando se ingresa placa
         entry_placa_liq.bind('<KeyRelease>', lambda e: calcular_tarifa())
@@ -1473,6 +1478,11 @@ class SistemaControlAccesoPostgreSQL:
                     return
             else:
                 if self.db and self.db.conectado:
+                    # Verificar que tenemos los datos necesarios
+                    if datos_visitante['id'] is None or datos_visitante['parqueadero_id'] is None:
+                        messagebox.showerror("Error", "❌ Datos del visitante incompletos")
+                        return
+                    
                     resultado = self.db.registrar_salida_visitante(
                         datos_visitante['id'], 
                         datos_visitante['parqueadero_id']
@@ -1480,11 +1490,17 @@ class SistemaControlAccesoPostgreSQL:
                     
                     if resultado:
                         messagebox.showinfo("✅ Cobro Exitoso", 
-                                          f"Placa: {placa}\nCobro: ${resultado['valor_pagado']:,.0f} COP\n✅ Salida registrada")
+                                          f"Placa: {placa}\n"
+                                          f"Tiempo: {resultado['total_horas']:.2f} horas\n"
+                                          f"Cobro: ${resultado['valor_pagado']:,.0f} COP\n"
+                                          f"✅ Salida registrada")
                         ventana_liq.destroy()
                     else:
                         messagebox.showerror("Error", "❌ Error registrando salida")
                         return
+                else:
+                    messagebox.showerror("Error", "❌ Sin conexión a la base de datos")
+                    return
             
             # Actualizar vistas después de cerrar
             self.actualizar_estadisticas()
