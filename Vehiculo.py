@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Sistema de Control de Acceso Vehicular - PostgreSQL (CORREGIDO: Liquidación funcional)"""
+"""Sistema de Control de Acceso Vehicular - PostgreSQL (CORREGIDO: Liquidación funcional + ESTILO MEJORADO)"""
 
 # =============================================================================
 # INSTALACIÓN DE DEPENDENCIAS (ejecutar en terminal)
@@ -707,227 +707,284 @@ class SistemaControlAccesoPostgreSQL:
         }
     
     def crear_interfaz(self):
-        """Crea la interfaz gráfica con tkinter"""
+        """Crea la interfaz gráfica con tkinter - ESTILO MEJORADO"""
         self.ventana = tk.Tk()
         self.ventana.title("🚗 Sistema de Control de Acceso Vehicular - PostgreSQL")
-        self.ventana.geometry("1200x800")
-        try:
-            self.ventana.tk.call('tk', 'scaling', 0.9)
-        except Exception:
-            pass
-        self.ventana.configure(bg='#ecf0f1')
+        self.ventana.geometry("1200x700")
+        self.ventana.configure(bg='#f5f5f5')
         
-        # Configurar estilos
+        # Configurar estilos modernos
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Colores del tema
-        color_primario = '#2c3e50'
-        color_secundario = '#34495e'
-        color_acento = '#3498db'
-        color_fondo = '#ecf0f1'
+        # Colores del tema moderno
+        color_primario = '#2c3e50'      # Azul oscuro
+        color_secundario = '#34495e'     # Azul grisáceo
+        color_acento = '#3498db'         # Azul brillante
+        color_exito = '#27ae60'          # Verde
+        color_advertencia = '#f39c12'    # Naranja
+        color_peligro = '#e74c3c'        # Rojo
+        color_fondo = '#f5f5f5'           # Gris muy claro
         
-        # Estilos
-        style.configure('TNotebook', background=color_fondo, borderwidth=0)
-        style.configure('TNotebook.Tab', padding=[20, 10], font=('Arial', 10, 'bold'))
-        style.map('TNotebook.Tab',
-                  background=[('selected', color_acento)],
-                  foreground=[('selected', 'white')])
+        # ========== MENÚ SUPERIOR DESTACADO ==========
+        menubar = tk.Menu(self.ventana, bg=color_primario, fg='white', 
+                          activebackground=color_acento, activeforeground='white',
+                          font=('Arial', 10, 'bold'))
+        self.ventana.config(menu=menubar)
         
-        style.configure('Title.TLabel', font=('Arial', 12, 'bold'), background=color_fondo)
-        style.configure('Header.TLabel', font=('Arial', 16, 'bold'), background=color_primario, foreground='white')
+        # Menú Archivo
+        file_menu = tk.Menu(menubar, tearoff=0, bg=color_secundario, fg='white',
+                           activebackground=color_acento, activeforeground='white')
+        menubar.add_cascade(label="📁 Archivo", menu=file_menu, background=color_primario)
+        file_menu.add_command(label="⚙️ Configuración", command=self.mostrar_configuracion)
+        file_menu.add_separator()
+        file_menu.add_command(label="🚪 Salir", command=self.ventana.quit)
         
-        # Menú superior
-        self.crear_menu_superior()
+        # Menú Parqueaderos
+        parking_menu = tk.Menu(menubar, tearoff=0, bg=color_secundario, fg='white',
+                              activebackground=color_acento, activeforeground='white')
+        menubar.add_cascade(label="🅿️ Parqueaderos", menu=parking_menu)
+        parking_menu.add_command(label="📊 Ver Estado", command=self.mostrar_estado_parqueaderos)
+        parking_menu.add_command(label="📋 Ver Historial", command=self.mostrar_historial)
         
-        # Header
-        header_frame = tk.Frame(self.ventana, bg=color_primario, height=110)
+        # Menú Reportes
+        reportes_menu = tk.Menu(menubar, tearoff=0, bg=color_secundario, fg='white',
+                               activebackground=color_acento, activeforeground='white')
+        menubar.add_cascade(label="📈 Reportes", menu=reportes_menu)
+        reportes_menu.add_command(label="💰 Reporte de Ingresos", command=self.mostrar_reporte_ingresos)
+        reportes_menu.add_command(label="📊 Estadísticas", command=self.mostrar_estadisticas_detalladas)
+        
+        # Menú Ayuda
+        ayuda_menu = tk.Menu(menubar, tearoff=0, bg=color_secundario, fg='white',
+                            activebackground=color_acento, activeforeground='white')
+        menubar.add_cascade(label="❓ Ayuda", menu=ayuda_menu)
+        ayuda_menu.add_command(label="📖 Manual de Usuario", command=self.mostrar_manual)
+        ayuda_menu.add_command(label="ℹ️ Acerca de", command=self.mostrar_acerca_de)
+        
+        # ========== BARRA SUPERIOR CON TÍTULO ==========
+        header_frame = tk.Frame(self.ventana, bg=color_primario, height=100)
         header_frame.pack(fill='x')
         header_frame.pack_propagate(False)
         
-        top_bar = tk.Frame(header_frame, bg='#e74c3c', height=4)
+        # Barra decorativa superior
+        top_bar = tk.Frame(header_frame, bg=color_peligro, height=4)
         top_bar.pack(fill='x')
         
+        # Contenedor del título y estado
+        title_container = tk.Frame(header_frame, bg=color_primario)
+        title_container.pack(expand=True, fill='both', padx=20)
+        
+        # Título principal
+        title_label = tk.Label(title_container, 
+                              text="🚗 SISTEMA DE CONTROL DE ACCESO VEHICULAR",
+                              font=('Arial', 18, 'bold'),
+                              bg=color_primario,
+                              fg='white')
+        title_label.pack(pady=(10, 5))
+        
+        # Subtítulo con estado de BD
         db_status = "PostgreSQL" if not self.usar_datos_memoria else "Memoria (Fallback)"
-        header_label = tk.Label(header_frame, 
-                    text=f"🚗 SISTEMA DE CONTROL DE ACCESO VEHICULAR",
-                    font=('Arial', 14, 'bold'),
-                    bg=color_primario,
-                    fg='white')
-        header_label.pack(pady=8)
+        db_color = color_exito if not self.usar_datos_memoria else color_advertencia
+        subtitle_frame = tk.Frame(title_container, bg=color_primario)
+        subtitle_frame.pack()
         
-        subtitle_label = tk.Label(header_frame,
-                                  text=f"Modo: {db_status} | Conjunto Residencial 'Los Alamos'",
-                                  font=('Arial', 10),
-                                  bg=color_primario,
-                                  fg='#ecf0f1')
-        subtitle_label.pack(pady=3)
+        tk.Label(subtitle_frame, text="Conjunto Residencial 'Los Alamos'", 
+                font=('Arial', 11), bg=color_primario, fg='#bdc3c7').pack(side='left', padx=5)
         
-        # ===== FRAME DE BÚSQUEDA DE PLACA =====
-        self.crear_frame_busqueda_placa()
+        tk.Label(subtitle_frame, text="|", font=('Arial', 11), 
+                bg=color_primario, fg='#bdc3c7').pack(side='left', padx=5)
         
-        # Frame de estadísticas
-        self.crear_frame_estadisticas()
+        tk.Label(subtitle_frame, text=f"Modo: ", font=('Arial', 11, 'bold'), 
+                bg=color_primario, fg='white').pack(side='left')
         
-        # Footer
-        footer_frame = tk.Frame(self.ventana, bg=color_primario, relief='raised', bd=3, height=130)
-        footer_frame.pack(fill='x', side='bottom', padx=0, pady=0)
-        footer_frame.pack_propagate(False)
+        tk.Label(subtitle_frame, text=db_status, font=('Arial', 11, 'bold'), 
+                bg=db_color, fg='white', padx=8, pady=2).pack(side='left')
         
-        line_top = tk.Frame(footer_frame, bg='#e74c3c', height=3)
-        line_top.pack(fill='x')
+        # ========== FRAME DE BÚSQUEDA Y ACCIONES ==========
+        self.crear_frame_busqueda_mejorado(color_primario, color_acento, color_exito, 
+                                           color_advertencia, color_peligro, color_fondo)
         
-        titulo_footer = tk.Label(footer_frame,
-                                text="📊 RESUMEN DEL DÍA",
-                                font=('Arial', 11, 'bold'),
-                                bg=color_primario,
-                                fg='#ecf0f1')
-        titulo_footer.pack(pady=4)
+        # ========== CONTENEDOR PRINCIPAL ==========
+        main_container = tk.Frame(self.ventana, bg=color_fondo)
+        main_container.pack(fill='both', expand=True, padx=20, pady=20)
         
-        numeros_frame = tk.Frame(footer_frame, bg=color_primario)
-        numeros_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        # Panel de resultados (ocupa la mayor parte)
+        self.crear_panel_resultados(main_container)
         
-        self.footer_labels = {}
-        resumen_data = [
-            ('total_parq', '🅿️ TOTAL', '#3498db'),
-            ('disponibles', '🟢 LIBRES', '#27ae60'),
-            ('ocupados', '🔴 OCUPADOS', '#e74c3c'),
-            ('visitantes', '👥 VISITANTES', '#9b59b6'),
-            ('recaudo', '💰 RECAUDO', '#f39c12')
-        ]
+        # ========== FOOTER CON ESTADÍSTICAS (PARTE INFERIOR) ==========
+        self.crear_footer_estadisticas(color_primario, color_exito, color_peligro, 
+                                       color_advertencia, color_acento)
         
-        for i, (key, text, color) in enumerate(resumen_data):
-            card = tk.Frame(numeros_frame, bg=color, relief='raised', bd=2)
-            card.pack(side='left', fill='both', expand=True, padx=4, pady=3)
-            
-            desc_label = tk.Label(card, text=text, font=('Arial', 9, 'bold'), 
-                                 bg=color, fg='white')
-            desc_label.pack(pady=3)
-            
-            self.footer_labels[key] = tk.Label(card, text="0", 
-                                              font=('Arial', 12, 'bold'), 
-                                              bg=color, 
-                                              fg='white')
-            self.footer_labels[key].pack(pady=2)
-        
-        copyright_label = tk.Label(footer_frame,
-                                  text="© 2024 Sistema Control Vehicular | versión 2.0 PostgreSQL",
-                                  font=('Arial', 8),
-                                  bg=color_primario,
-                                  fg='#95a5a6')
-        copyright_label.pack(pady=2)
-        
-        # Actualizar estadísticas cada segundo
+        # Actualizar estadísticas cada 2 segundos
         self.actualizar_estadisticas()
     
-    def crear_menu_superior(self):
-        """Crea el menú superior simplificado"""
-        menubar = tk.Menu(self.ventana)
-        self.ventana.config(menu=menubar)
+    def crear_frame_busqueda_mejorado(self, color_primario, color_acento, color_exito, 
+                                      color_advertencia, color_peligro, color_fondo):
+        """Crea el frame de búsqueda mejorado con botones de acción"""
         
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Archivo", menu=file_menu)
-        file_menu.add_command(label="Salir", command=self.ventana.quit)
-    
-    def crear_frame_busqueda_placa(self):
-        """Crea frame de búsqueda y registro de placa en la parte superior"""
-        busqueda_frame = tk.Frame(self.ventana, bg='#ecf0f1', relief='raised', bd=2, height=200)
-        busqueda_frame.pack(fill='x', padx=0, pady=0)
-        busqueda_frame.pack_propagate(False)
+        # Frame principal de búsqueda
+        busqueda_frame = tk.Frame(self.ventana, bg='white', relief='solid', bd=1)
+        busqueda_frame.pack(fill='x', padx=20, pady=(10, 0))
         
-        contenedor = tk.Frame(busqueda_frame, bg='#ecf0f1')
-        contenedor.pack(fill='both', expand=True, padx=15, pady=12)
+        # Contenedor con padding
+        contenedor = tk.Frame(busqueda_frame, bg='white')
+        contenedor.pack(fill='both', expand=True, padx=20, pady=15)
         
-        titulo = tk.Label(contenedor, text="🔍 INGRESE PLACA DEL VEHÍCULO", 
-                         font=('Arial', 12, 'bold'), bg='#ecf0f1', fg='#2c3e50')
-        titulo.pack(anchor='w', pady=(0, 8))
+        # Título de la sección
+        tk.Label(contenedor, text="🔍 BÚSQUEDA DE VEHÍCULOS", 
+                font=('Arial', 12, 'bold'), bg='white', fg=color_primario).pack(anchor='w', pady=(0, 10))
         
-        # Frame para entrada y botones principales
-        entrada_frame = tk.Frame(contenedor, bg='#ecf0f1')
+        # Fila de entrada de placa
+        entrada_frame = tk.Frame(contenedor, bg='white')
         entrada_frame.pack(fill='x', pady=5)
         
-        tk.Label(entrada_frame, text="Placa:", font=('Arial', 10, 'bold'), 
-                bg='#ecf0f1', fg='#2c3e50').pack(side='left', padx=(0, 10))
+        tk.Label(entrada_frame, text="PLACA:", font=('Arial', 10, 'bold'), 
+                bg='white', fg=color_primario).pack(side='left', padx=(0, 10))
         
-        self.entry_placa = tk.Entry(entrada_frame, font=('Arial', 11, 'bold'), 
-                        width=12, relief='solid', bd=2, 
-                        bg='white', fg='#2c3e50')
+        self.entry_placa = tk.Entry(entrada_frame, font=('Arial', 12, 'bold'), 
+                                   width=15, relief='solid', bd=2, bg='#f8f9fa', fg=color_primario)
         self.entry_placa.pack(side='left', padx=5)
         self.entry_placa.bind('<Return>', lambda e: self.buscar_placa_entrada())
         
         btn_buscar = tk.Button(entrada_frame, text="🔍 Buscar", 
-                      command=self.buscar_placa_entrada,
-                      bg='#3498db', fg='white', font=('Arial', 9, 'bold'),
-                      relief='flat', bd=0, padx=12, pady=4,
-                      activebackground='#2980b9')
+                              command=self.buscar_placa_entrada,
+                              bg=color_acento, fg='white', font=('Arial', 9, 'bold'),
+                              relief='flat', bd=0, padx=15, pady=5,
+                              activebackground='#2980b9', cursor='hand2')
         btn_buscar.pack(side='left', padx=5)
         
         btn_limpiar = tk.Button(entrada_frame, text="🗑️ Limpiar", 
-                       command=lambda: self.entry_placa.delete(0, tk.END),
-                       bg='#e74c3c', fg='white', font=('Arial', 9, 'bold'),
-                       relief='flat', bd=0, padx=12, pady=4,
-                       activebackground='#c0392b')
+                               command=lambda: self.entry_placa.delete(0, tk.END),
+                               bg=color_peligro, fg='white', font=('Arial', 9, 'bold'),
+                               relief='flat', bd=0, padx=15, pady=5,
+                               activebackground='#c0392b', cursor='hand2')
         btn_limpiar.pack(side='left', padx=5)
         
-        # Frame de botones de acción (SEPARADOS POR TIPO)
-        botones_accion_frame = tk.Frame(contenedor, bg='#ecf0f1')
-        botones_accion_frame.pack(fill='x', pady=8)
+        # Separador
+        ttk.Separator(contenedor, orient='horizontal').pack(fill='x', pady=10)
         
-        tk.Label(botones_accion_frame, text="ACCIONES:", font=('Arial', 9, 'bold'), 
-                bg='#ecf0f1', fg='#2c3e50').pack(side='left', padx=(0, 15))
+        # Panel de botones de acción (DESTACADO)
+        acciones_frame = tk.Frame(contenedor, bg='white')
+        acciones_frame.pack(fill='x', pady=5)
         
-        # Botón para RESIDENTES (entrada)
-        btn_entrada_residente = tk.Button(botones_accion_frame, text="👨‍💼 ENTRADA RESIDENTE", 
-                         command=self.registrar_entrada_residente,
-                         bg='#27ae60', fg='white', font=('Arial', 9, 'bold'),
-                         relief='flat', bd=0, padx=12, pady=4,
-                         activebackground='#229954')
-        btn_entrada_residente.pack(side='left', padx=5)
+        tk.Label(acciones_frame, text="ACCIONES:", font=('Arial', 10, 'bold'), 
+                bg='white', fg=color_primario).pack(side='left', padx=(0, 15))
         
-        # Botón para VISITANTES (entrada)
-        btn_entrada_visitante = tk.Button(botones_accion_frame, text="👥 ENTRADA VISITANTE", 
-                         command=self.registrar_entrada_visitante,
-                         bg='#f39c12', fg='white', font=('Arial', 9, 'bold'),
-                         relief='flat', bd=0, padx=12, pady=4,
-                         activebackground='#e67e22')
-        btn_entrada_visitante.pack(side='left', padx=5)
+        # Botones con iconos y colores
+        btn_residente_entrada = tk.Button(acciones_frame, text="👤 ENTRADA RESIDENTE", 
+                                         command=self.registrar_entrada_residente,
+                                         bg=color_acento, fg='white', font=('Arial', 9, 'bold'),
+                                         relief='flat', bd=0, padx=12, pady=5,
+                                         activebackground='#2980b9', cursor='hand2')
+        btn_residente_entrada.pack(side='left', padx=2)
         
-        # Botón para LIQUIDAR VISITANTE (SALIDA CON PAGO)
-        btn_liquidar = tk.Button(botones_accion_frame, text="💰 LIQUIDAR VISITANTE", 
-                        command=self.abrir_ventana_liquidar,
-                        bg='#16a085', fg='white', font=('Arial', 9, 'bold'),
-                        relief='flat', bd=0, padx=12, pady=4,
-                        activebackground='#138d75')
-        btn_liquidar.pack(side='left', padx=5)
+        btn_residente_salida = tk.Button(acciones_frame, text="👤 SALIDA RESIDENTE", 
+                                        command=self.registrar_salida_residente,
+                                        bg='#7f8c8d', fg='white', font=('Arial', 9, 'bold'),
+                                        relief='flat', bd=0, padx=12, pady=5,
+                                        activebackground='#6c7a7d', cursor='hand2')
+        btn_residente_salida.pack(side='left', padx=2)
         
-        # Botón para SALIDA DE RESIDENTE (sin pago)
-        btn_salida_residente = tk.Button(botones_accion_frame, text="🚪 SALIDA RESIDENTE", 
-                         command=self.registrar_salida_residente,
-                         bg='#3498db', fg='white', font=('Arial', 9, 'bold'),
-                         relief='flat', bd=0, padx=12, pady=4,
-                         activebackground='#2980b9')
-        btn_salida_residente.pack(side='left', padx=5)
+        btn_visitante_entrada = tk.Button(acciones_frame, text="👥 ENTRADA VISITANTE", 
+                                         command=self.registrar_entrada_visitante,
+                                         bg=color_exito, fg='white', font=('Arial', 9, 'bold'),
+                                         relief='flat', bd=0, padx=12, pady=5,
+                                         activebackground='#229954', cursor='hand2')
+        btn_visitante_entrada.pack(side='left', padx=2)
         
-        # Botón ver parqueaderos
-        btn_ver_parqueaderos = tk.Button(botones_accion_frame, text="📊 VER PARQUEADEROS", 
-                         command=self.mostrar_estado_parqueaderos,
-                         bg='#8e44ad', fg='white', font=('Arial', 9, 'bold'),
-                         relief='flat', bd=0, padx=12, pady=4,
-                         activebackground='#7d3c98')
-        btn_ver_parqueaderos.pack(side='left', padx=5)
+        btn_visitante_liquidar = tk.Button(acciones_frame, text="💰 LIQUIDAR VISITANTE", 
+                                          command=self.abrir_ventana_liquidar,
+                                          bg=color_advertencia, fg='white', font=('Arial', 9, 'bold'),
+                                          relief='flat', bd=0, padx=12, pady=5,
+                                          activebackground='#e67e22', cursor='hand2')
+        btn_visitante_liquidar.pack(side='left', padx=2)
         
-        # Frame de resultado MEJORADO
-        resultado_frame = tk.Frame(contenedor, bg='#ecf0f1')
-        resultado_frame.pack(fill='x', pady=8)
+        btn_ver_parqueaderos = tk.Button(acciones_frame, text="📊 VER PARQUEADEROS", 
+                                        command=self.mostrar_estado_parqueaderos,
+                                        bg='#9b59b6', fg='white', font=('Arial', 9, 'bold'),
+                                        relief='flat', bd=0, padx=12, pady=5,
+                                        activebackground='#8e44ad', cursor='hand2')
+        btn_ver_parqueaderos.pack(side='left', padx=2)
+    
+    def crear_panel_resultados(self, parent):
+        """Crea el panel de resultados"""
         
-        self.panel_resultado_placa = tk.Frame(resultado_frame, bg='#ecf0f1', relief='solid', bd=2)
-        self.panel_resultado_placa.pack(fill='both', expand=True)
+        # Frame para resultados
+        resultados_frame = tk.Frame(parent, bg='white', relief='solid', bd=1)
+        resultados_frame.pack(fill='both', expand=True)
+        
+        # Título del panel
+        tk.Label(resultados_frame, text="📋 RESULTADO DE BÚSQUEDA", 
+                font=('Arial', 11, 'bold'), bg='#2c3e50', fg='white',
+                padx=15, pady=8).pack(fill='x')
+        
+        # Panel de resultado mejorado
+        self.panel_resultado_placa = tk.Frame(resultados_frame, bg='#f8f9fa', relief='flat')
+        self.panel_resultado_placa.pack(fill='both', expand=True, padx=20, pady=20)
         
         self.label_resultado_placa = tk.Label(self.panel_resultado_placa, 
-                                             text="📝 Ingrese una placa y presione Buscar", 
-                                             font=('Arial', 11, 'bold'), bg='#ecf0f1', 
-                                             fg='#7f8c8d', relief='flat', bd=0, padx=15, pady=10)
-        self.label_resultado_placa.pack(fill='both', expand=True)
+                                             text="📝 Ingrese una placa y presione 'Buscar'", 
+                                             font=('Arial', 14), bg='#f8f9fa', 
+                                             fg='#7f8c8d', justify='center')
+        self.label_resultado_placa.pack(expand=True)
+    
+    def crear_footer_estadisticas(self, color_primario, color_exito, color_peligro, 
+                                  color_advertencia, color_acento):
+        """Crea el footer con estadísticas en la parte inferior"""
+        
+        footer_frame = tk.Frame(self.ventana, bg=color_primario, relief='raised', bd=2, height=120)
+        footer_frame.pack(fill='x', side='bottom')
+        footer_frame.pack_propagate(False)
+        
+        # Barra decorativa superior
+        top_line = tk.Frame(footer_frame, bg=color_advertencia, height=3)
+        top_line.pack(fill='x')
+        
+        # Título del footer
+        titulo_footer = tk.Label(footer_frame,
+                                text="📊 ESTADÍSTICAS EN TIEMPO REAL",
+                                font=('Arial', 11, 'bold'),
+                                bg=color_primario,
+                                fg='white')
+        titulo_footer.pack(pady=5)
+        
+        # Contenedor de estadísticas
+        stats_container = tk.Frame(footer_frame, bg=color_primario)
+        stats_container.pack(fill='both', expand=True, padx=20, pady=5)
+        
+        self.footer_labels = {}
+        
+        # Estadísticas en fila
+        stats_data = [
+            ('total_parq', '🅿️ TOTAL', '#3498db'),
+            ('disponibles', '🟢 LIBRES', color_exito),
+            ('ocupados', '🔴 OCUPADOS', color_peligro),
+            ('visitantes', '👥 VISITANTES', '#9b59b6'),
+            ('recaudo', '💰 RECAUDO HOY', color_advertencia)
+        ]
+        
+        for i, (key, text, color) in enumerate(stats_data):
+            # Card de estadística
+            card = tk.Frame(stats_container, bg=color, relief='ridge', bd=2)
+            card.pack(side='left', fill='both', expand=True, padx=5, pady=3)
+            
+            # Título
+            tk.Label(card, text=text, font=('Arial', 9, 'bold'), 
+                    bg=color, fg='white', pady=2).pack(fill='x')
+            
+            # Valor
+            self.footer_labels[key] = tk.Label(card, text="0", 
+                                              font=('Arial', 14, 'bold'), 
+                                              bg=color, fg='white', pady=5)
+            self.footer_labels[key].pack(fill='x')
+        
+        # Copyright
+        copyright_label = tk.Label(footer_frame,
+                                  text="© 2024 Sistema Control Vehicular | Versión 2.0 PostgreSQL",
+                                  font=('Arial', 8),
+                                  bg=color_primario,
+                                  fg='#95a5a6')
+        copyright_label.pack(pady=2)
     
     def buscar_placa_entrada(self):
         """Busca una placa en el sistema y muestra el resultado con colores"""
@@ -944,7 +1001,7 @@ class SistemaControlAccesoPostgreSQL:
                 if placa in self.datos_memoria['residentes']:
                     residente = self.datos_memoria['residentes'][placa]
                     estado_visual = "🟢 LIBRE" if residente['estado'].lower() == 'libre' else "🔴 OCUPADO"
-                    texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n"
+                    texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n\n"
                             f"Nombre: {residente['nombre']}\n"
                             f"Apartamento: {residente['apartamento']}\n"
                             f"Parqueadero: {residente['parqueadero']}\n"
@@ -957,12 +1014,12 @@ class SistemaControlAccesoPostgreSQL:
                         datos = self.datos_memoria['visitantes_activos'][placa]
                         tiempo = datetime.now() - datos['hora_entrada']
                         horas = tiempo.total_seconds() / 3600
-                        texto = (f"👥 VISITANTE ACTIVO\n"
+                        texto = (f"👥 VISITANTE ACTIVO\n\n"
                                 f"Placa: {placa}\n"
                                 f"Parqueadero: {datos['parqueadero']}\n"
                                 f"Tiempo: {horas:.1f} horas")
                     else:
-                        texto = (f"👥 VISITANTE (NO REGISTRADO)\n"
+                        texto = (f"👥 VISITANTE (NO REGISTRADO)\n\n"
                                 f"Placa: {placa}\n"
                                 f"Acción: Use 'ENTRADA VISITANTE' para ingresar")
                     
@@ -974,7 +1031,7 @@ class SistemaControlAccesoPostgreSQL:
                     residente = self.db.verificar_placa_residente(placa)
                     
                     if residente:
-                        texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n"
+                        texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n\n"
                                 f"Nombre: {residente['nombre']}\n"
                                 f"Apartamento: {residente['apartamento']}\n"
                                 f"Parqueadero: {residente['parqueadero']}\n"
@@ -985,12 +1042,18 @@ class SistemaControlAccesoPostgreSQL:
                         # Verificar si es visitante activo
                         visitante = self.db.obtener_visitante_activo_por_placa(placa)
                         if visitante:
-                            texto = (f"👥 VISITANTE ACTIVO\n"
+                            hora_entrada = visitante['hora_entrada']
+                            if hasattr(hora_entrada, 'strftime'):
+                                hora_str = hora_entrada.strftime('%H:%M')
+                            else:
+                                hora_str = str(hora_entrada)
+                            
+                            texto = (f"👥 VISITANTE ACTIVO\n\n"
                                     f"Placa: {placa}\n"
                                     f"Parqueadero: {visitante['parqueadero']}\n"
-                                    f"Hora entrada: {visitante['hora_entrada'].strftime('%H:%M') if hasattr(visitante['hora_entrada'], 'strftime') else visitante['hora_entrada']}")
+                                    f"Hora entrada: {hora_str}")
                         else:
-                            texto = (f"👥 VISITANTE (NO REGISTRADO)\n"
+                            texto = (f"👥 VISITANTE (NO REGISTRADO)\n\n"
                                     f"Placa: {placa}\n"
                                     f"Acción: Use 'ENTRADA VISITANTE' para ingresar")
                         
@@ -1049,7 +1112,7 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="Ingrese una placa para buscar...", fg='#7f8c8d', bg='#ecf0f1')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
             self.actualizar_estadisticas()
             
         except Exception as e:
@@ -1121,9 +1184,8 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="Ingrese una placa para buscar...", fg='#7f8c8d', bg='#ecf0f1')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
             self.actualizar_estadisticas()
-            self.actualizar_lista_parqueaderos()
             
         except Exception as e:
             messagebox.showerror("Error", f"Error al registrar entrada: {str(e)}")
@@ -1174,67 +1236,85 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="Ingrese una placa para buscar...", fg='#7f8c8d', bg='#ecf0f1')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
             self.actualizar_estadisticas()
             
         except Exception as e:
             messagebox.showerror("Error", f"Error al registrar salida: {str(e)}")
     
     def abrir_ventana_liquidar(self):
-        """Abre ventana para liquidar pago de visitante (SALIDA CON PAGO)"""
+        """Abre ventana para liquidar pago de visitante (SALIDA CON PAGO) - CORREGIDA"""
         placa_inicial = self.entry_placa.get().upper().strip()
         
         ventana_liq = tk.Toplevel(self.ventana)
         ventana_liq.title("💰 Liquidar Pago de Visitante")
-        ventana_liq.geometry("550x450")
+        ventana_liq.geometry("600x550")
         ventana_liq.resizable(False, False)
-        ventana_liq.configure(bg='#ecf0f1')
+        ventana_liq.configure(bg='#f5f5f5')
         
         ventana_liq.transient(self.ventana)
         ventana_liq.grab_set()
         
-        # Encabezado
-        header = tk.Frame(ventana_liq, bg='#16a085', height=50)
+        # Encabezado con gradiente
+        header = tk.Frame(ventana_liq, bg='#16a085', height=70)
         header.pack(fill='x')
         header.pack_propagate(False)
-        tk.Label(header, text="💰 LIQUIDAR PAGO DE VISITANTE", font=('Arial', 14, 'bold'), 
-                bg='#16a085', fg='white').pack(pady=10)
+        
+        tk.Label(header, text="💰 LIQUIDAR PAGO DE VISITANTE", 
+                font=('Arial', 16, 'bold'), bg='#16a085', fg='white').pack(pady=20)
         
         # Frame principal
-        main_frame = tk.Frame(ventana_liq, bg='#ecf0f1')
-        main_frame.pack(fill='both', expand=True, padx=20, pady=15)
+        main_frame = tk.Frame(ventana_liq, bg='#f5f5f5')
+        main_frame.pack(fill='both', expand=True, padx=25, pady=20)
         
         # Campo placa
-        tk.Label(main_frame, text="Placa del Visitante:", font=('Arial', 10, 'bold'),
-                bg='#ecf0f1', fg='#2c3e50').pack(anchor='w', pady=(0, 5))
-        entry_placa_liq = tk.Entry(main_frame, font=('Arial', 12), width=20,
-                                   relief='solid', bd=2, bg='white')
-        entry_placa_liq.pack(fill='x', pady=(0, 15))
+        tk.Label(main_frame, text="Placa del Visitante:", font=('Arial', 11, 'bold'),
+                bg='#f5f5f5', fg='#2c3e50').pack(anchor='w', pady=(0, 5))
+        
+        entry_frame = tk.Frame(main_frame, bg='#f5f5f5')
+        entry_frame.pack(fill='x', pady=(0, 15))
+        
+        entry_placa_liq = tk.Entry(entry_frame, font=('Arial', 14, 'bold'), 
+                                   width=15, relief='solid', bd=2, bg='white',
+                                   fg='#2c3e50', justify='center')
+        entry_placa_liq.pack(side='left')
+        
         if placa_inicial:
             entry_placa_liq.insert(0, placa_inicial)
         entry_placa_liq.focus()
         
         # Frame de información calculada
-        info_frame = tk.Frame(main_frame, bg='#fdeaa8', relief='solid', bd=2)
-        info_frame.pack(fill='x', pady=(0, 15))
+        info_frame = tk.Frame(main_frame, bg='white', relief='solid', bd=2)
+        info_frame.pack(fill='x', pady=(0, 20))
         
-        tk.Label(info_frame, text="📊 CÁLCULO DE TARIFA", font=('Arial', 10, 'bold'),
-                bg='#f39c12', fg='white', padx=10, pady=5).pack(fill='x')
+        # Título del info frame
+        tk.Label(info_frame, text="📊 CÁLCULO DE TARIFA", font=('Arial', 11, 'bold'),
+                bg='#f39c12', fg='white', padx=15, pady=8).pack(fill='x')
         
-        label_calculo_tiempo = tk.Label(info_frame, text="⏱️ Tiempo: --",
-                                            font=('Arial', 10), bg='#fdeaa8', fg='#2c3e50',
-                                            anchor='w', padx=15, pady=5)
-        label_calculo_tiempo.pack(fill='x')
+        # Contenido del info frame
+        content_frame = tk.Frame(info_frame, bg='white', padx=20, pady=15)
+        content_frame.pack(fill='x')
         
-        label_calculo_tarifa = tk.Label(info_frame, text="💵 Tarifa: --",
-                                            font=('Arial', 11, 'bold'), bg='#fdeaa8', fg='#27ae60',
-                                            anchor='w', padx=15, pady=5)
-        label_calculo_tarifa.pack(fill='x')
+        # Labels para mostrar la información
+        label_calculo_tiempo = tk.Label(content_frame, text="⏱️ Tiempo: --",
+                                        font=('Arial', 11), bg='white', fg='#2c3e50',
+                                        anchor='w')
+        label_calculo_tiempo.pack(fill='x', pady=3)
         
-        label_calculo_tipo = tk.Label(info_frame, text="📌 Tipo: --",
-                                          font=('Arial', 10), bg='#fdeaa8', fg='#2c3e50',
-                                          anchor='w', padx=15, pady=(5, 10))
-        label_calculo_tipo.pack(fill='x')
+        label_calculo_tarifa = tk.Label(content_frame, text="💵 Valor a pagar: --",
+                                        font=('Arial', 14, 'bold'), bg='white', fg='#27ae60',
+                                        anchor='w')
+        label_calculo_tarifa.pack(fill='x', pady=3)
+        
+        label_calculo_tipo = tk.Label(content_frame, text="📌 Tipo de tarifa: --",
+                                      font=('Arial', 11), bg='white', fg='#2c3e50',
+                                      anchor='w')
+        label_calculo_tipo.pack(fill='x', pady=3)
+        
+        label_hora_entrada = tk.Label(content_frame, text="🕐 Hora entrada: --",
+                                      font=('Arial', 10), bg='white', fg='#7f8c8d',
+                                      anchor='w')
+        label_hora_entrada.pack(fill='x', pady=3)
         
         # Variable para guardar datos del visitante
         datos_visitante = {'id': None, 'parqueadero_id': None, 'placa': ''}
@@ -1246,8 +1326,9 @@ class SistemaControlAccesoPostgreSQL:
             
             if not placa:
                 label_calculo_tiempo.config(text="⏱️ Tiempo: --")
-                label_calculo_tarifa.config(text="💵 Tarifa: --")
-                label_calculo_tipo.config(text="📌 Tipo: --")
+                label_calculo_tarifa.config(text="💵 Valor a pagar: --")
+                label_calculo_tipo.config(text="📌 Tipo de tarifa: --")
+                label_hora_entrada.config(text="🕐 Hora entrada: --")
                 datos_visitante['id'] = None
                 return
             
@@ -1263,44 +1344,52 @@ class SistemaControlAccesoPostgreSQL:
                     tiempo = hora_salida - hora_entrada
                     horas = tiempo.total_seconds() / 3600
                     
+                    # Mostrar hora de entrada
+                    label_hora_entrada.config(text=f"🕐 Hora entrada: {hora_entrada.strftime('%H:%M:%S')}")
+                    
                     if horas <= 5:
                         cobro = int(np.ceil(horas)) * 1000
-                        tipo = "Tarifa por hora ($1000/hora)"
+                        tipo = "Tarifa por hora ($1,000/hora)"
                     else:
                         cobro = 10000
-                        tipo = "Tarifa plena ($10000)"
+                        tipo = "Tarifa plena ($10,000)"
                     
                     tarifa_calculada['valor'] = cobro
                     
-                    label_calculo_tiempo.config(text=f"⏱️ Tiempo: {horas:.2f} horas")
-                    label_calculo_tarifa.config(text=f"💵 Tarifa: ${cobro:,} COP")
-                    label_calculo_tipo.config(text=f"📌 Tipo: {tipo}")
+                    label_calculo_tiempo.config(text=f"⏱️ Tiempo estacionado: {horas:.2f} horas")
+                    label_calculo_tarifa.config(text=f"💵 VALOR A PAGAR: ${cobro:,} COP")
+                    label_calculo_tipo.config(text=f"📌 {tipo}")
                 else:
-                    label_calculo_tiempo.config(text="⏱️ Tiempo: ❌ Placa no encontrada o no es visitante activo")
-                    label_calculo_tarifa.config(text="💵 Tarifa: $0")
-                    label_calculo_tipo.config(text="📌 Tipo: Error")
+                    label_calculo_tiempo.config(text="⏱️ Tiempo: --")
+                    label_calculo_tarifa.config(text="💵 VALOR A PAGAR: $0 COP")
+                    label_calculo_tipo.config(text="📌 ❌ Placa no encontrada o no es visitante activo")
+                    label_hora_entrada.config(text="🕐 Hora entrada: --")
                     tarifa_calculada['valor'] = 0
                     datos_visitante['id'] = None
             else:
                 if self.db and self.db.conectado:
                     visitante = self.db.obtener_visitante_activo_por_placa(placa)
                     if visitante:
-                        hora_entrada_str = visitante['hora_entrada']
+                        hora_entrada = visitante['hora_entrada']
                         
-                        if isinstance(hora_entrada_str, str):
+                        if isinstance(hora_entrada, str):
                             try:
-                                hora_entrada = datetime.fromisoformat(hora_entrada_str.replace('Z', '+00:00'))
+                                hora_entrada = datetime.fromisoformat(hora_entrada.replace('Z', '+00:00'))
                             except:
-                                hora_entrada = datetime.strptime(hora_entrada_str, '%Y-%m-%d %H:%M:%S')
-                        else:
-                            hora_entrada = hora_entrada_str
+                                hora_entrada = datetime.strptime(hora_entrada, '%Y-%m-%d %H:%M:%S')
                         
-                        if hora_entrada.tzinfo is not None:
+                        if hasattr(hora_entrada, 'tzinfo') and hora_entrada.tzinfo is not None:
                             hora_entrada = hora_entrada.replace(tzinfo=None)
                         
                         datos_visitante['id'] = visitante['id']
                         datos_visitante['parqueadero_id'] = visitante['parqueadero_id']
                         datos_visitante['placa'] = placa
+                        
+                        # Mostrar hora de entrada
+                        if hasattr(hora_entrada, 'strftime'):
+                            label_hora_entrada.config(text=f"🕐 Hora entrada: {hora_entrada.strftime('%H:%M:%S')}")
+                        else:
+                            label_hora_entrada.config(text=f"🕐 Hora entrada: {str(hora_entrada)}")
                         
                         hora_salida = datetime.now()
                         tiempo = hora_salida - hora_entrada
@@ -1308,20 +1397,21 @@ class SistemaControlAccesoPostgreSQL:
                         
                         if horas <= 5:
                             cobro = int(np.ceil(horas)) * 1000
-                            tipo = "Tarifa por hora ($1000/hora)"
+                            tipo = "Tarifa por hora ($1,000/hora)"
                         else:
                             cobro = 10000
-                            tipo = "Tarifa plena ($10000)"
+                            tipo = "Tarifa plena ($10,000)"
                         
                         tarifa_calculada['valor'] = cobro
                         
-                        label_calculo_tiempo.config(text=f"⏱️ Tiempo: {horas:.2f} horas")
-                        label_calculo_tarifa.config(text=f"💵 Tarifa: ${cobro:,} COP")
-                        label_calculo_tipo.config(text=f"📌 Tipo: {tipo}")
+                        label_calculo_tiempo.config(text=f"⏱️ Tiempo estacionado: {horas:.2f} horas")
+                        label_calculo_tarifa.config(text=f"💵 VALOR A PAGAR: ${cobro:,} COP")
+                        label_calculo_tipo.config(text=f"📌 {tipo}")
                     else:
-                        label_calculo_tiempo.config(text="⏱️ Tiempo: ❌ Placa no encontrada o no es visitante activo")
-                        label_calculo_tarifa.config(text="💵 Tarifa: $0")
-                        label_calculo_tipo.config(text="📌 Tipo: Error")
+                        label_calculo_tiempo.config(text="⏱️ Tiempo: --")
+                        label_calculo_tarifa.config(text="💵 VALOR A PAGAR: $0 COP")
+                        label_calculo_tipo.config(text="📌 ❌ Placa no encontrada o no es visitante activo")
+                        label_hora_entrada.config(text="🕐 Hora entrada: --")
                         tarifa_calculada['valor'] = 0
                         datos_visitante['id'] = None
         
@@ -1333,8 +1423,8 @@ class SistemaControlAccesoPostgreSQL:
             ventana_liq.after(100, calcular_tarifa)
         
         # Frame de botones
-        btn_frame = tk.Frame(main_frame, bg='#ecf0f1')
-        btn_frame.pack(fill='x', pady=10)
+        btn_frame = tk.Frame(main_frame, bg='#f5f5f5')
+        btn_frame.pack(fill='x', pady=20)
         
         def liquidar_confirmar():
             placa = entry_placa_liq.get().upper().strip()
@@ -1398,23 +1488,22 @@ class SistemaControlAccesoPostgreSQL:
             
             # Actualizar vistas después de cerrar
             self.actualizar_estadisticas()
-            self.actualizar_lista_parqueaderos()
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="Ingrese una placa para buscar...", fg='#7f8c8d', bg='#ecf0f1')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
         
-        btn_liquidar = tk.Button(btn_frame, text="✅ CONFIRMAR PAGO Y REGISTRAR SALIDA", 
+        btn_liquidar = tk.Button(btn_frame, text="✅ CONFIRMAR PAGO Y SALIDA", 
                                  command=liquidar_confirmar,
-                                 bg='#16a085', fg='white', font=('Arial', 10, 'bold'),
-                                 relief='flat', bd=0, padx=20, pady=10,
-                                 activebackground='#138d75')
-        btn_liquidar.pack(side='left', fill='both', expand=True, padx=(0, 5))
+                                 bg='#16a085', fg='white', font=('Arial', 11, 'bold'),
+                                 relief='flat', bd=0, padx=20, pady=12,
+                                 activebackground='#138d75', cursor='hand2')
+        btn_liquidar.pack(fill='x', pady=(0, 10))
         
         btn_cancelar = tk.Button(btn_frame, text="❌ Cancelar", 
                                  command=ventana_liq.destroy,
-                                 bg='#e74c3c', fg='white', font=('Arial', 10, 'bold'),
+                                 bg='#e74c3c', fg='white', font=('Arial', 10),
                                  relief='flat', bd=0, padx=20, pady=10,
-                                 activebackground='#c0392b')
-        btn_cancelar.pack(side='left', fill='both', expand=True, padx=(5, 0))
+                                 activebackground='#c0392b', cursor='hand2')
+        btn_cancelar.pack(fill='x')
     
     def mostrar_estado_parqueaderos(self):
         """Muestra ventana con estado de todos los parqueaderos"""
@@ -1422,23 +1511,23 @@ class SistemaControlAccesoPostgreSQL:
         ventana_estado.title("📊 Estado de Parqueaderos")
         ventana_estado.geometry("700x600")
         ventana_estado.resizable(True, True)
-        ventana_estado.configure(bg='#ecf0f1')
+        ventana_estado.configure(bg='#f5f5f5')
         
         ventana_estado.transient(self.ventana)
         ventana_estado.grab_set()
         
-        header = tk.Frame(ventana_estado, bg='#8e44ad', height=50)
+        header = tk.Frame(ventana_estado, bg='#9b59b6', height=60)
         header.pack(fill='x')
         header.pack_propagate(False)
-        tk.Label(header, text="📊 ESTADO DE TODOS LOS PARQUEADEROS", font=('Arial', 14, 'bold'), 
-                bg='#8e44ad', fg='white').pack(pady=10)
+        tk.Label(header, text="📊 ESTADO DE TODOS LOS PARQUEADEROS", 
+                font=('Arial', 16, 'bold'), bg='#9b59b6', fg='white').pack(pady=15)
         
-        canvas_frame = tk.Frame(ventana_estado, bg='#ecf0f1')
+        canvas_frame = tk.Frame(ventana_estado, bg='#f5f5f5')
         canvas_frame.pack(fill='both', expand=True, padx=20, pady=15)
         
-        canvas = tk.Canvas(canvas_frame, bg='#fff', relief='solid', bd=1)
+        canvas = tk.Canvas(canvas_frame, bg='white', relief='solid', bd=1)
         scrollbar = ttk.Scrollbar(canvas_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg='#fff')
+        scrollable_frame = tk.Frame(canvas, bg='white')
         
         scrollable_frame.bind(
             "<Configure>",
@@ -1457,8 +1546,8 @@ class SistemaControlAccesoPostgreSQL:
             
             # Mostrar residentes
             lbl_res_header = tk.Label(scrollable_frame, text="👨‍💼 PARQUEADEROS RESIDENTES", 
-                                     font=('Arial', 11, 'bold'), bg='#3498db', fg='white',
-                                     padx=10, pady=8, relief='flat')
+                                     font=('Arial', 12, 'bold'), bg='#3498db', fg='white',
+                                     padx=15, pady=10)
             lbl_res_header.pack(fill='x', pady=(0, 10))
             
             for placa, datos in self.datos_memoria['residentes'].items():
@@ -1466,19 +1555,19 @@ class SistemaControlAccesoPostgreSQL:
                 estado_texto = "🟢 LIBRE" if datos['estado'].lower() == 'libre' else "🔴 OCUPADO"
                 
                 card = tk.Frame(scrollable_frame, bg=estado_color, relief='solid', bd=2)
-                card.pack(fill='x', pady=5, padx=5)
+                card.pack(fill='x', pady=5, padx=10)
                 
                 info_text = (f"Parqueadero #{datos['parqueadero']} | {estado_texto} | "
                             f"Residente: {datos['nombre']} (Apto {datos['apartamento']}) | Placa: {placa}")
                 
                 lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
-                              bg=estado_color, fg='white', anchor='w', justify='left', padx=10, pady=8)
+                              bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
                 lbl.pack(fill='x')
             
             # Mostrar visitantes
             lbl_vis_header = tk.Label(scrollable_frame, text="👥 PARQUEADEROS VISITANTES", 
-                                     font=('Arial', 11, 'bold'), bg='#9b59b6', fg='white',
-                                     padx=10, pady=8, relief='flat')
+                                     font=('Arial', 12, 'bold'), bg='#9b59b6', fg='white',
+                                     padx=15, pady=10)
             lbl_vis_header.pack(fill='x', pady=(15, 10))
             
             for placa, datos in self.datos_memoria['visitantes_activos'].items():
@@ -1486,23 +1575,23 @@ class SistemaControlAccesoPostgreSQL:
                 horas = tiempo.total_seconds() / 3600
                 
                 card = tk.Frame(scrollable_frame, bg='#f39c12', relief='solid', bd=2)
-                card.pack(fill='x', pady=5, padx=5)
+                card.pack(fill='x', pady=5, padx=10)
                 
-                info_text = (f"Parqueadero #{datos['parqueadero']} | 🔴 OCUPADO (visitante) | "
+                info_text = (f"Parqueadero #{datos['parqueadero']} | 🔴 OCUPADO | "
                             f"Placa: {placa} | Tiempo: {horas:.1f}h")
                 
                 lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
-                              bg='#f39c12', fg='white', anchor='w', justify='left', padx=10, pady=8)
+                              bg='#f39c12', fg='white', anchor='w', padx=15, pady=10)
                 lbl.pack(fill='x')
             
             for parq_num in self.datos_memoria['parqueaderos_visitantes']:
                 card = tk.Frame(scrollable_frame, bg='#27ae60', relief='solid', bd=2)
-                card.pack(fill='x', pady=5, padx=5)
+                card.pack(fill='x', pady=5, padx=10)
                 
-                info_text = f"Parqueadero #{parq_num} | 🟢 LIBRE (disponible para visitante)"
+                info_text = f"Parqueadero #{parq_num} | 🟢 LIBRE (disponible)"
                 
                 lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
-                              bg='#27ae60', fg='white', anchor='w', justify='left', padx=10, pady=8)
+                              bg='#27ae60', fg='white', anchor='w', padx=15, pady=10)
                 lbl.pack(fill='x')
         else:
             if self.db and self.db.conectado:
@@ -1513,7 +1602,7 @@ class SistemaControlAccesoPostgreSQL:
                     estado_texto = "🟢 LIBRE" if p['estado'] == 'LIBRE' else "🔴 OCUPADO"
                     
                     card = tk.Frame(scrollable_frame, bg=estado_color, relief='solid', bd=2)
-                    card.pack(fill='x', pady=5, padx=5)
+                    card.pack(fill='x', pady=5, padx=10)
                     
                     residente = p['residente'] if p['residente'] else "-"
                     apartamento = p['apartamento'] if p['apartamento'] else "-"
@@ -1523,149 +1612,44 @@ class SistemaControlAccesoPostgreSQL:
                                 f"Residente: {residente} (Apto {apartamento}) | Placa: {placa}")
                     
                     lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
-                                  bg=estado_color, fg='white', anchor='w', justify='left', padx=10, pady=8)
+                                  bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
                     lbl.pack(fill='x')
     
-    def crear_frame_estadisticas(self):
-        """Crea frame con estadísticas en tiempo real por tipo de parqueadero"""
-        self.stats_frame = tk.Frame(self.ventana, bg='#2c3e50', relief='ridge', bd=3)
-        self.stats_frame.pack(fill='x', padx=0, pady=0)
-        
-        main_container = tk.Frame(self.stats_frame, bg='#34495e')
-        main_container.pack(fill='x', padx=0, pady=0)
-        
-        # SECCIÓN DE RESIDENTES
-        residentes_container = tk.Frame(main_container, bg='#34495e')
-        residentes_container.pack(fill='x', padx=15, pady=12)
-        
-        residentes_label = tk.Label(residentes_container, text="👨‍💼 PARQUEADEROS RESIDENTES", 
-                         font=('Arial', 11, 'bold'), bg='#3498db', fg='white',
-                         relief='flat', bd=0, padx=10, pady=8)
-        residentes_label.pack(fill='x', padx=0, pady=(0, 8))
-        
-        self.stats_labels = {}
-        residentes_data = [
-            ('residentes_total', '🅿️ Total', '#3498db'),
-            ('residentes_ocupados', '🔴 Ocupados', '#e74c3c'),
-            ('residentes_libres', '🟢 Libres', '#27ae60'),
-            ('residentes_ingresos', '💵 Ingresos', '#16a085')
-        ]
-        
-        residentes_row = tk.Frame(main_container, bg='#34495e')
-        residentes_row.pack(fill='x', padx=15, pady=(0, 12))
-        
-        for i, (key, text, color) in enumerate(residentes_data):
-            card = tk.Frame(residentes_row, bg=color, relief='raised', bd=2)
-            card.pack(side='left', fill='both', expand=True, padx=6, pady=3)
-            
-            label_titulo = tk.Label(card, text=text, font=('Arial', 9, 'bold'), bg=color, fg='white', pady=3)
-            label_titulo.pack(fill='x')
-            
-            self.stats_labels[key] = tk.Label(card, text="0", font=('Arial', 12, 'bold'), 
-                                             bg=color, fg='white', pady=5)
-            self.stats_labels[key].pack(fill='x')
-        
-        # SECCIÓN DE VISITANTES
-        visitantes_container = tk.Frame(main_container, bg='#34495e')
-        visitantes_container.pack(fill='x', padx=15, pady=(0, 12))
-        
-        visitantes_label = tk.Label(visitantes_container, text="👥 PARQUEADEROS VISITANTES", 
-                        font=('Arial', 11, 'bold'), bg='#9b59b6', fg='white',
-                        relief='flat', bd=0, padx=10, pady=8)
-        visitantes_label.pack(fill='x', padx=0, pady=(0, 8))
-        
-        visitantes_data = [
-            ('visitantes_total', '🅿️ Total', '#9b59b6'),
-            ('visitantes_ocupados', '🔴 Ocupados', '#e74c3c'),
-            ('visitantes_libres', '🟢 Libres', '#27ae60'),
-            ('visitantes_activos', '⏱️ Activos', '#f39c12')
-        ]
-        
-        visitantes_row = tk.Frame(main_container, bg='#34495e')
-        visitantes_row.pack(fill='x', padx=15, pady=(0, 12))
-        
-        for i, (key, text, color) in enumerate(visitantes_data):
-            card = tk.Frame(visitantes_row, bg=color, relief='raised', bd=2)
-            card.pack(side='left', fill='both', expand=True, padx=6, pady=3)
-            
-            label_titulo = tk.Label(card, text=text, font=('Arial', 9, 'bold'), bg=color, fg='white', pady=3)
-            label_titulo.pack(fill='x')
-            
-            self.stats_labels[key] = tk.Label(card, text="0", font=('Arial', 12, 'bold'), 
-                                             bg=color, fg='white', pady=5)
-            self.stats_labels[key].pack(fill='x')
-        
-        # SECCIÓN DE TOTALES
-        totales_container = tk.Frame(main_container, bg='#34495e')
-        totales_container.pack(fill='x', padx=15, pady=(0, 12))
-        
-        totales_label = tk.Label(totales_container, text="📊 RESUMEN GENERAL", 
-                    font=('Arial', 11, 'bold'), bg='#2c3e50', fg='white',
-                    relief='flat', bd=0, padx=10, pady=8)
-        totales_label.pack(fill='x', padx=0, pady=(0, 8))
-        
-        totales_data = [
-            ('total_parqueaderos', '🅿️ TOTAL', '#2c3e50'),
-            ('total_ocupados', '🔴 OCUPADOS', '#34495e'),
-            ('visitantes_ingresos', '💰 RECAUDO', '#1abc9c'),
-        ]
-        
-        totales_row = tk.Frame(main_container, bg='#34495e')
-        totales_row.pack(fill='x', padx=15, pady=(0, 12))
-        
-        for i, (key, text, color) in enumerate(totales_data):
-            card = tk.Frame(totales_row, bg=color, relief='raised', bd=2)
-            card.pack(side='left', fill='both', expand=True, padx=6, pady=3)
-            
-            label_titulo = tk.Label(card, text=text, font=('Arial', 9, 'bold'), bg=color, fg='white', pady=3)
-            label_titulo.pack(fill='x')
-            
-            self.stats_labels[key] = tk.Label(card, text="0", font=('Arial', 12, 'bold'), 
-                                             bg=color, fg='white', pady=5)
-            self.stats_labels[key].pack(fill='x')
-        
-        # SECCIÓN DE VEHÍCULOS ACTIVOS
-        activos_container = tk.Frame(main_container, bg='#34495e')
-        activos_container.pack(fill='x', padx=15, pady=(0, 12))
-        
-        activos_label = tk.Label(activos_container, text="🚗 VEHÍCULOS EN PARQUEADERO AHORA", 
-                    font=('Arial', 11, 'bold'), bg='#34495e', fg='white',
-                    relief='flat', bd=0, padx=10, pady=8)
-        activos_label.pack(fill='x', padx=0, pady=(0, 8))
-        
-        residentes_activos_frame = tk.Frame(main_container, bg='#27ae60', relief='solid', bd=1)
-        residentes_activos_frame.pack(fill='x', padx=15, pady=(0, 6))
-        
-        tk.Label(residentes_activos_frame, text="👨‍💼 RESIDENTES EN PARQUEADERO", 
-            font=('Arial', 9, 'bold'), bg='#27ae60', fg='white', padx=10, pady=5).pack(fill='x')
-
-        self.label_residentes_activos = tk.Label(residentes_activos_frame, text="• Ninguno", 
-                             font=('Arial', 8), bg='#d5f4e6', fg='#27ae60', 
-                             justify='left', padx=15, pady=6, relief='flat')
-        self.label_residentes_activos.pack(fill='both', expand=True, padx=5, pady=5)
-        
-        visitantes_activos_frame = tk.Frame(main_container, bg='#f39c12', relief='solid', bd=1)
-        visitantes_activos_frame.pack(fill='x', padx=15, pady=(0, 12))
-        
-        tk.Label(visitantes_activos_frame, text="👥 VISITANTES EN PARQUEADERO", 
-            font=('Arial', 9, 'bold'), bg='#f39c12', fg='white', padx=10, pady=5).pack(fill='x')
-
-        self.label_visitantes_activos = tk.Label(visitantes_activos_frame, text="• Ninguno", 
-                             font=('Arial', 8), bg='#fdeaa8', fg='#e67e22', 
-                             justify='left', padx=15, pady=6, relief='flat')
-        self.label_visitantes_activos.pack(fill='both', expand=True, padx=5, pady=5)
+    def mostrar_configuracion(self):
+        """Muestra ventana de configuración"""
+        messagebox.showinfo("Configuración", "Ventana de configuración en desarrollo")
     
-    def actualizar_lista_parqueaderos(self):
-        """Actualiza la lista de parqueaderos disponibles para visitantes"""
-        if self.usar_datos_memoria:
-            disponibles = [str(p) for p in self.datos_memoria['parqueaderos_visitantes']]
-        else:
-            if self.db and self.db.conectado:
-                parqueaderos = self.db.obtener_parqueaderos_libres_visitantes()
-                disponibles = [str(p['numero']) for p in parqueaderos]
+    def mostrar_historial(self):
+        """Muestra el historial de visitantes"""
+        messagebox.showinfo("Historial", "Ventana de historial en desarrollo")
+    
+    def mostrar_reporte_ingresos(self):
+        """Muestra reporte de ingresos"""
+        messagebox.showinfo("Reporte de Ingresos", "Ventana de reportes en desarrollo")
+    
+    def mostrar_estadisticas_detalladas(self):
+        """Muestra estadísticas detalladas"""
+        messagebox.showinfo("Estadísticas", "Ventana de estadísticas en desarrollo")
+    
+    def mostrar_manual(self):
+        """Muestra el manual de usuario"""
+        messagebox.showinfo("Manual de Usuario", 
+                           "Manual de uso:\n\n"
+                           "1. Ingrese la placa en el campo superior\n"
+                           "2. Presione 'Buscar' para verificar\n"
+                           "3. Use los botones de acción según corresponda\n"
+                           "4. Las estadísticas se actualizan automáticamente")
+    
+    def mostrar_acerca_de(self):
+        """Muestra información acerca de la aplicación"""
+        messagebox.showinfo("Acerca de", 
+                           "🚗 Sistema de Control de Acceso Vehicular\n"
+                           "Versión 2.0 PostgreSQL\n\n"
+                           "© 2024 Conjunto Residencial 'Los Alamos'\n"
+                           "Desarrollado con Python y Tkinter")
     
     def actualizar_estadisticas(self):
-        """Actualiza las estadísticas en tiempo real por tipo de parqueadero"""
+        """Actualiza las estadísticas en tiempo real"""
         if self.usar_datos_memoria:
             total_residentes = len(self.datos_memoria['residentes'])
             total_parqueaderos_visitantes = self.datos_memoria.get('total_parqueaderos_visitantes', 5)
@@ -1679,92 +1663,29 @@ class SistemaControlAccesoPostgreSQL:
             total = total_residentes + total_parqueaderos_visitantes
             total_historial = sum(r['cobro'] for r in self.datos_memoria['historial_visitantes'])
             
-            self.stats_labels['residentes_total'].config(text=str(total_residentes))
-            self.stats_labels['residentes_ocupados'].config(text=str(ocupados_residentes))
-            self.stats_labels['residentes_libres'].config(text=str(libres_residentes))
-            self.stats_labels['residentes_ingresos'].config(text="$0")
-            
-            self.stats_labels['visitantes_total'].config(text=str(total_parqueaderos_visitantes))
-            self.stats_labels['visitantes_ocupados'].config(text=str(ocupados_visitantes))
-            self.stats_labels['visitantes_libres'].config(text=str(libres_visitantes))
-            self.stats_labels['visitantes_activos'].config(text=str(ocupados_visitantes))
-            
-            self.stats_labels['total_parqueaderos'].config(text=str(total))
-            self.stats_labels['total_ocupados'].config(text=str(ocupados_residentes + ocupados_visitantes))
-            self.stats_labels['visitantes_ingresos'].config(text=f"${total_historial:,.0f}")
-            
             libres_totales = libres_residentes + libres_visitantes
             self.footer_labels['total_parq'].config(text=str(total))
             self.footer_labels['disponibles'].config(text=str(libres_totales))
             self.footer_labels['ocupados'].config(text=str(ocupados_residentes + ocupados_visitantes))
             self.footer_labels['visitantes'].config(text=str(total_parqueaderos_visitantes))
             self.footer_labels['recaudo'].config(text=f"${total_historial:,.0f}")
-            
-            residentes_ocupados = [
-                f"• {placa}: {datos['nombre']} (Apto {datos['apartamento']}) - Parqueadero {datos['parqueadero']}"
-                for placa, datos in self.datos_memoria['residentes'].items() 
-                if datos['estado'].lower() == 'ocupado'
-            ]
-            
-            if residentes_ocupados:
-                self.label_residentes_activos.config(text='\n'.join(residentes_ocupados))
-            else:
-                self.label_residentes_activos.config(text="• Ninguno")
-            
-            visitantes_ocupados = [
-                f"• {placa} - Parqueadero {datos['parqueadero']}"
-                for placa, datos in self.datos_memoria['visitantes_activos'].items()
-            ]
-            
-            if visitantes_ocupados:
-                self.label_visitantes_activos.config(text='\n'.join(visitantes_ocupados))
-            else:
-                self.label_visitantes_activos.config(text="• Ninguno")
         else:
             if self.db and self.db.conectado:
-                stats = self.db.obtener_estadisticas_por_tipo()
+                stats = self.db.obtener_estadisticas()
                 
-                res_stats = stats['residentes']
-                self.stats_labels['residentes_total'].config(text=str(res_stats['total']))
-                self.stats_labels['residentes_ocupados'].config(text=str(res_stats['ocupados']))
-                self.stats_labels['residentes_libres'].config(text=str(res_stats['libres']))
-                self.stats_labels['residentes_ingresos'].config(text=f"${res_stats['ingresos']:,.0f}")
+                total_parq = stats['total_parqueaderos']
+                ocupados = stats['ocupados']
+                libres = total_parq - ocupados
+                visitantes_activos = stats['visitantes_activos']
+                recaudo_hoy = stats['recaudado_hoy']
                 
-                vis_stats = stats['visitantes']
-                self.stats_labels['visitantes_total'].config(text=str(vis_stats['total']))
-                self.stats_labels['visitantes_ocupados'].config(text=str(vis_stats['ocupados']))
-                self.stats_labels['visitantes_libres'].config(text=str(vis_stats['libres']))
-                self.stats_labels['visitantes_activos'].config(text=str(vis_stats['activos']))
-                
-                total_parqueaderos = res_stats['total'] + vis_stats['total']
-                total_ocupados = res_stats['ocupados'] + vis_stats['ocupados']
-                total_libres = res_stats['libres'] + vis_stats['libres']
-                self.stats_labels['total_parqueaderos'].config(text=str(total_parqueaderos))
-                self.stats_labels['total_ocupados'].config(text=str(total_ocupados))
-                self.stats_labels['visitantes_ingresos'].config(text=f"${vis_stats['ingresos']:,.0f}")
-                
-                general_stats = self.db.obtener_estadisticas()
-                recaudo_hoy = general_stats['recaudado_hoy']
-                
-                self.footer_labels['total_parq'].config(text=str(total_parqueaderos))
-                self.footer_labels['disponibles'].config(text=str(total_libres))
-                self.footer_labels['ocupados'].config(text=str(total_ocupados))
-                self.footer_labels['visitantes'].config(text=str(vis_stats['total']))
+                self.footer_labels['total_parq'].config(text=str(total_parq))
+                self.footer_labels['disponibles'].config(text=str(libres))
+                self.footer_labels['ocupados'].config(text=str(ocupados))
+                self.footer_labels['visitantes'].config(text=str(visitantes_activos))
                 self.footer_labels['recaudo'].config(text=f"${recaudo_hoy:,.0f}")
-                
-                visitantes_activos = self.db.obtener_visitantes_activos()
-                if visitantes_activos:
-                    self.label_visitantes_activos.config(
-                        text='\n'.join([f"• {v['placa']} - P-{v['parqueadero']}" for v in visitantes_activos])
-                    )
-                else:
-                    self.label_visitantes_activos.config(text="• Ninguno")
         
         self.ventana.after(2000, self.actualizar_estadisticas)
-    
-    def actualizar_todas_tablas(self):
-        """Actualiza todas las tablas"""
-        pass
     
     def ejecutar(self):
         """Ejecuta la aplicación"""
