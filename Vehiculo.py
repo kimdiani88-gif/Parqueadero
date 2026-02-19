@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Sistema de Control de Acceso Vehicular - PostgreSQL (CORREGIDO: Liquidación funcional + ESTILO MEJORADO)"""
+"""Sistema de Control de Acceso Vehicular - PostgreSQL (CORREGIDO: Liquidación funcional + ESTILO MEJORADO + COLORES OPTIMIZADOS)"""
 
 # =============================================================================
 # INSTALACIÓN DE DEPENDENCIAS (ejecutar en terminal)
@@ -808,7 +808,7 @@ class SistemaControlAccesoPostgreSQL:
         main_container = tk.Frame(self.ventana, bg=color_fondo)
         main_container.pack(fill='both', expand=True, padx=20, pady=20)
         
-        # Panel de resultados (ocupa la mayor parte)
+        # Panel de resultados (ocupa la mayor parte) - CON COLORES MEJORADOS
         self.crear_panel_resultados(main_container)
         
         # ========== FOOTER CON ESTADÍSTICAS (PARTE INFERIOR) ==========
@@ -907,26 +907,40 @@ class SistemaControlAccesoPostgreSQL:
         btn_ver_parqueaderos.pack(side='left', padx=2)
     
     def crear_panel_resultados(self, parent):
-        """Crea el panel de resultados"""
+        """Crea el panel de resultados con mejor contraste y formato"""
         
         # Frame para resultados
-        resultados_frame = tk.Frame(parent, bg='white', relief='solid', bd=1)
+        resultados_frame = tk.Frame(parent, bg='white', relief='solid', bd=2)
         resultados_frame.pack(fill='both', expand=True)
         
-        # Título del panel
-        tk.Label(resultados_frame, text="📋 RESULTADO DE BÚSQUEDA", 
-                font=('Arial', 11, 'bold'), bg='#2c3e50', fg='white',
-                padx=15, pady=8).pack(fill='x')
+        # Título del panel con mejor contraste
+        titulo_frame = tk.Frame(resultados_frame, bg='#2c3e50', height=40)
+        titulo_frame.pack(fill='x')
+        titulo_frame.pack_propagate(False)
         
-        # Panel de resultado mejorado
-        self.panel_resultado_placa = tk.Frame(resultados_frame, bg='#f8f9fa', relief='flat')
-        self.panel_resultado_placa.pack(fill='both', expand=True, padx=20, pady=20)
+        tk.Label(titulo_frame, text="📋 RESULTADO DE BÚSQUEDA", 
+                font=('Arial', 12, 'bold'), bg='#2c3e50', fg='white',
+                pady=10).pack(expand=True)
         
-        self.label_resultado_placa = tk.Label(self.panel_resultado_placa, 
-                                             text="📝 Ingrese una placa y presione 'Buscar'", 
-                                             font=('Arial', 14), bg='#f8f9fa', 
-                                             fg='#7f8c8d', justify='center')
-        self.label_resultado_placa.pack(expand=True)
+        # Panel de resultado con mejor contraste
+        self.panel_resultado_placa = tk.Frame(
+            resultados_frame, 
+            bg='#ffffff',  # Blanco puro para mejor contraste
+            relief='sunken', 
+            bd=2
+        )
+        self.panel_resultado_placa.pack(fill='both', expand=True, padx=15, pady=15)
+        
+        self.label_resultado_placa = tk.Label(
+            self.panel_resultado_placa, 
+            text="📝 Ingrese una placa y presione 'Buscar'", 
+            font=('Arial', 14), 
+            bg='#ffffff', 
+            fg='#34495e',  # Azul grisáceo oscuro para mejor contraste
+            justify='center',
+            wraplength=500
+        )
+        self.label_resultado_placa.pack(expand=True, padx=20, pady=20)
     
     def crear_footer_estadisticas(self, color_primario, color_exito, color_peligro, 
                                   color_advertencia, color_acento):
@@ -987,12 +1001,16 @@ class SistemaControlAccesoPostgreSQL:
         copyright_label.pack(pady=2)
     
     def buscar_placa_entrada(self):
-        """Busca una placa en el sistema y muestra el resultado con colores"""
+        """Busca una placa en el sistema y muestra el resultado con colores MEJORADOS"""
         placa = self.entry_placa.get().upper().strip()
         
         if not placa:
-            self.label_resultado_placa.config(text="⚠️ Por favor ingrese una placa", fg='#e74c3c')
-            self.panel_resultado_placa.config(bg='#fadbd8')
+            self.label_resultado_placa.config(
+                text="⚠️ POR FAVOR INGRESE UNA PLACA", 
+                fg='#c0392b',  # Rojo más oscuro para mejor contraste
+                font=('Arial', 14, 'bold')
+            )
+            self.panel_resultado_placa.config(bg='#fdedec')  # Rojo muy claro
             return
         
         try:
@@ -1002,12 +1020,19 @@ class SistemaControlAccesoPostgreSQL:
                     residente = self.datos_memoria['residentes'][placa]
                     estado_visual = "🟢 LIBRE" if residente['estado'].lower() == 'libre' else "🔴 OCUPADO"
                     texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n\n"
-                            f"Nombre: {residente['nombre']}\n"
-                            f"Apartamento: {residente['apartamento']}\n"
-                            f"Parqueadero: {residente['parqueadero']}\n"
-                            f"Estado: {estado_visual}")
-                    self.label_resultado_placa.config(text=texto, fg='white')
-                    self.panel_resultado_placa.config(bg='#27ae60')
+                            f"┌─────────────────────────┐\n"
+                            f"│ Nombre: {residente['nombre']:<20} │\n"
+                            f"│ Apartamento: {residente['apartamento']:<14} │\n"
+                            f"│ Parqueadero: {residente['parqueadero']:<14} │\n"
+                            f"│ Estado: {estado_visual:<18} │\n"
+                            f"└─────────────────────────┘")
+                    self.label_resultado_placa.config(
+                        text=texto, 
+                        fg='#1e3c2c',  # Verde oscuro para mejor contraste
+                        font=('Courier', 12, 'bold'),  # Fuente monoespaciada para mejor formato
+                        justify='left'
+                    )
+                    self.panel_resultado_placa.config(bg='#d4edda')  # Verde muy claro
                 else:
                     # Verificar si es visitante activo
                     if placa in self.datos_memoria['visitantes_activos']:
@@ -1015,56 +1040,94 @@ class SistemaControlAccesoPostgreSQL:
                         tiempo = datetime.now() - datos['hora_entrada']
                         horas = tiempo.total_seconds() / 3600
                         texto = (f"👥 VISITANTE ACTIVO\n\n"
-                                f"Placa: {placa}\n"
-                                f"Parqueadero: {datos['parqueadero']}\n"
-                                f"Tiempo: {horas:.1f} horas")
+                                f"┌─────────────────────────┐\n"
+                                f"│ Placa: {placa:<21} │\n"
+                                f"│ Parqueadero: {datos['parqueadero']:<15} │\n"
+                                f"│ Tiempo: {horas:.1f} horas{' ':<9} │\n"
+                                f"└─────────────────────────┘")
                     else:
-                        texto = (f"👥 VISITANTE (NO REGISTRADO)\n\n"
-                                f"Placa: {placa}\n"
-                                f"Acción: Use 'ENTRADA VISITANTE' para ingresar")
+                        texto = (f"👥 VISITANTE NO REGISTRADO\n\n"
+                                f"┌─────────────────────────┐\n"
+                                f"│ Placa: {placa:<21} │\n"
+                                f"│ Acción: Use 'ENTRADA'    │\n"
+                                f"└─────────────────────────┘")
                     
-                    self.label_resultado_placa.config(text=texto, fg='white')
-                    self.panel_resultado_placa.config(bg='#f39c12')
+                    self.label_resultado_placa.config(
+                        text=texto, 
+                        fg='#7b4a1e',  # Marrón oscuro para mejor contraste
+                        font=('Courier', 12, 'bold'),
+                        justify='left'
+                    )
+                    self.panel_resultado_placa.config(bg='#fff3cd')  # Amarillo claro
             else:
                 # Buscar en PostgreSQL
                 if self.db and self.db.conectado:
                     residente = self.db.verificar_placa_residente(placa)
                     
                     if residente:
+                        estado_color_texto = '#1e3c2c' if residente['estado'] == 'LIBRE' else '#7a1f1f'
                         texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n\n"
-                                f"Nombre: {residente['nombre']}\n"
-                                f"Apartamento: {residente['apartamento']}\n"
-                                f"Parqueadero: {residente['parqueadero']}\n"
-                                f"Estado: {residente['estado']}")
-                        self.label_resultado_placa.config(text=texto, fg='white')
-                        self.panel_resultado_placa.config(bg='#27ae60')
+                                f"┌─────────────────────────┐\n"
+                                f"│ Nombre: {residente['nombre']:<20} │\n"
+                                f"│ Apartamento: {residente['apartamento']:<14} │\n"
+                                f"│ Parqueadero: {residente['parqueadero']:<14} │\n"
+                                f"│ Estado: {residente['estado']:<20} │\n"
+                                f"└─────────────────────────┘")
+                        self.label_resultado_placa.config(
+                            text=texto, 
+                            fg=estado_color_texto,
+                            font=('Courier', 12, 'bold'),
+                            justify='left'
+                        )
+                        self.panel_resultado_placa.config(
+                            bg='#d4edda' if residente['estado'] == 'LIBRE' else '#f8d7da'
+                        )
                     else:
                         # Verificar si es visitante activo
                         visitante = self.db.obtener_visitante_activo_por_placa(placa)
                         if visitante:
                             hora_entrada = visitante['hora_entrada']
                             if hasattr(hora_entrada, 'strftime'):
-                                hora_str = hora_entrada.strftime('%H:%M')
+                                hora_str = hora_entrada.strftime('%H:%M:%S')
                             else:
                                 hora_str = str(hora_entrada)
                             
                             texto = (f"👥 VISITANTE ACTIVO\n\n"
-                                    f"Placa: {placa}\n"
-                                    f"Parqueadero: {visitante['parqueadero']}\n"
-                                    f"Hora entrada: {hora_str}")
+                                    f"┌─────────────────────────┐\n"
+                                    f"│ Placa: {placa:<21} │\n"
+                                    f"│ Parqueadero: {visitante['parqueadero']:<15} │\n"
+                                    f"│ Entrada: {hora_str:<19} │\n"
+                                    f"└─────────────────────────┘")
                         else:
-                            texto = (f"👥 VISITANTE (NO REGISTRADO)\n\n"
-                                    f"Placa: {placa}\n"
-                                    f"Acción: Use 'ENTRADA VISITANTE' para ingresar")
+                            texto = (f"👥 VISITANTE NO REGISTRADO\n\n"
+                                    f"┌─────────────────────────┐\n"
+                                    f"│ Placa: {placa:<21} │\n"
+                                    f"│ Acción: Use 'ENTRADA'    │\n"
+                                    f"└─────────────────────────┘")
                         
-                        self.label_resultado_placa.config(text=texto, fg='white')
-                        self.panel_resultado_placa.config(bg='#f39c12')
+                        self.label_resultado_placa.config(
+                            text=texto, 
+                            fg='#7b4a1e',
+                            font=('Courier', 12, 'bold'),
+                            justify='left'
+                        )
+                        self.panel_resultado_placa.config(bg='#fff3cd')
                 else:
-                    self.label_resultado_placa.config(text="❌ Error: Sin conexión a base de datos", fg='#e74c3c')
-                    self.panel_resultado_placa.config(bg='#fadbd8')
+                    self.label_resultado_placa.config(
+                        text="❌ ERROR DE CONEXIÓN\n\nNo hay conexión a la base de datos", 
+                        fg='#7a1f1f',
+                        font=('Arial', 14, 'bold'),
+                        justify='center'
+                    )
+                    self.panel_resultado_placa.config(bg='#f8d7da')
         except Exception as e:
-            self.label_resultado_placa.config(text=f"❌ Error en búsqueda: {str(e)}", fg='#e74c3c')
-            self.panel_resultado_placa.config(bg='#fadbd8')
+            self.label_resultado_placa.config(
+                text=f"❌ ERROR\n\n{str(e)}", 
+                fg='#7a1f1f',
+                font=('Arial', 12, 'bold'),
+                justify='center'
+            )
+            self.panel_resultado_placa.config(bg='#f8d7da')
     
     def registrar_entrada_residente(self):
         """Registra la entrada de un residente (sin pago)"""
@@ -1112,7 +1175,8 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.panel_resultado_placa.config(bg='#ffffff')
             self.actualizar_estadisticas()
             
         except Exception as e:
@@ -1184,7 +1248,8 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.panel_resultado_placa.config(bg='#ffffff')
             self.actualizar_estadisticas()
             
         except Exception as e:
@@ -1236,7 +1301,8 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.panel_resultado_placa.config(bg='#ffffff')
             self.actualizar_estadisticas()
             
         except Exception as e:
@@ -1505,7 +1571,8 @@ class SistemaControlAccesoPostgreSQL:
             # Actualizar vistas después de cerrar
             self.actualizar_estadisticas()
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#7f8c8d', bg='#f8f9fa')
+            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar'", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.panel_resultado_placa.config(bg='#ffffff')
         
         btn_liquidar = tk.Button(btn_frame, text="✅ CONFIRMAR PAGO Y SALIDA", 
                                  command=liquidar_confirmar,
