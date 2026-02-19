@@ -1029,7 +1029,7 @@ class SistemaControlAccesoPostgreSQL:
                     self.label_resultado_placa.config(
                         text=texto, 
                         fg='#1e3c2c',  # Verde oscuro para mejor contraste
-                        font=('Courier', 12, 'bold'),  # Fuente monoespaciada para mejor formato
+                        font=('Arial', 12, 'bold'),  # Fuente monoespaciada para mejor formato
                         justify='left'
                     )
                     self.panel_resultado_placa.config(bg='#d4edda')  # Verde muy claro
@@ -1055,7 +1055,7 @@ class SistemaControlAccesoPostgreSQL:
                     self.label_resultado_placa.config(
                         text=texto, 
                         fg='#7b4a1e',  # Marrón oscuro para mejor contraste
-                        font=('Courier', 12, 'bold'),
+                        font=('Arial', 12, 'bold'),
                         justify='left'
                     )
                     self.panel_resultado_placa.config(bg='#fff3cd')  # Amarillo claro
@@ -1076,7 +1076,7 @@ class SistemaControlAccesoPostgreSQL:
                         self.label_resultado_placa.config(
                             text=texto, 
                             fg=estado_color_texto,
-                            font=('Courier', 12, 'bold'),
+                            font=('Arial', 12, 'bold'),
                             justify='left'
                         )
                         self.panel_resultado_placa.config(
@@ -1108,7 +1108,7 @@ class SistemaControlAccesoPostgreSQL:
                         self.label_resultado_placa.config(
                             text=texto, 
                             fg='#7b4a1e',
-                            font=('Courier', 12, 'bold'),
+                            font=('Arial', 12, 'bold'),
                             justify='left'
                         )
                         self.panel_resultado_placa.config(bg='#fff3cd')
