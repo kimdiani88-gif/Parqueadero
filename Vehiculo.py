@@ -119,7 +119,7 @@ class CapturadorPlaca:
 
         main_frame = scrollable_frame
 
-        
+    
         # Frame para el video
         self.video_frame = tk.Frame(main_frame, bg='black', width=640, height=480)
         self.video_frame.pack(pady=10)
@@ -209,6 +209,7 @@ class CapturadorPlaca:
                 self.video_label.image = img_tk
             
             # Programar siguiente actualización
+
             if self.capturando:
                 self.ventana_cam.after(30, self.actualizar_video)
 
