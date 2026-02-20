@@ -86,7 +86,7 @@ class PostgreSQLManager:
             'database': config.get('database', 'control_acceso'),
             'user': config.get('user', 'postgres'),
             'password': config.get('password', ''),
-            'port': config.get('port', 5432)
+            'port': config.get('port', 5433)
         }
         
         # Intentar conectar
@@ -712,7 +712,7 @@ class SistemaControlAccesoPostgreSQL:
         self.ventana.title("🚗 Sistema de Control de Acceso Vehicular - PostgreSQL")
         self.ventana.geometry("1200x700")
         self.ventana.configure(bg='#f5f5f5')
-        
+                
         # Configurar estilos modernos
         style = ttk.Style()
         style.theme_use('clam')
@@ -929,7 +929,7 @@ class SistemaControlAccesoPostgreSQL:
             relief='sunken', 
             bd=2
         )
-        self.panel_resultado_placa.pack(fill='both', expand=True, padx=15, pady=15)
+        self.panel_resultado_placa.pack(fill='both', expand=True, padx=10, pady=10)
         
         self.label_resultado_placa = tk.Label(
             self.panel_resultado_placa, 
@@ -940,7 +940,7 @@ class SistemaControlAccesoPostgreSQL:
             justify='center',
             wraplength=500
         )
-        self.label_resultado_placa.pack(expand=True, padx=20, pady=20)
+        self.label_resultado_placa.pack(expand=True, padx=15, pady=15)
     
     def crear_footer_estadisticas(self, color_primario, color_exito, color_peligro, 
                                   color_advertencia, color_acento):
@@ -1094,7 +1094,7 @@ class SistemaControlAccesoPostgreSQL:
                             
                             texto = (f"👥 VISITANTE ACTIVO\n\n"
                                     f"┌─────────────────────────┐\n"
-                                    f"│ Placa: {placa:<21} │\n"
+                                    f"│ Placa: {placa:<21}      │\n"
                                     f"│ Parqueadero: {visitante['parqueadero']:<15} │\n"
                                     f"│ Entrada: {hora_str:<19} │\n"
                                     f"└─────────────────────────┘")
@@ -1641,7 +1641,7 @@ class SistemaControlAccesoPostgreSQL:
                 card.pack(fill='x', pady=5, padx=10)
                 
                 info_text = (f"Parqueadero #{datos['parqueadero']} | {estado_texto} | "
-                            f"Residente: {datos['nombre']} (Apto {datos['apartamento']}) | Placa: {placa}")
+                            f"Residente: {datos['nombre']} (Apto {datos['apartamento']}) | Placa: {datos['placa']}")
                 
                 lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
                               bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
@@ -1687,12 +1687,22 @@ class SistemaControlAccesoPostgreSQL:
                     card = tk.Frame(scrollable_frame, bg=estado_color, relief='solid', bd=2)
                     card.pack(fill='x', pady=5, padx=10)
                     
-                    residente = p['residente'] if p['residente'] else "-"
-                    apartamento = p['apartamento'] if p['apartamento'] else "-"
-                    placa = p['placa'] if p['placa'] else "-"
+                    residente = p['residente'] 
+                    apartamento = p['apartamento'] if p['apartamento'] else " "
+                    placa = p['placa'] if p['placa'] else " "
                     
+                    if residente:
+                        residente_texto = f"Residente: {residente}"
+                    else:
+                        residente_texto = "Visitante "
+                    
+                    if apartamento:
+                        apartamento_texto = f"(Apto {apartamento})"
+                    else:
+                        apartamento_texto = " "
+                             
                     info_text = (f"Parqueadero #{p['numero']} | {estado_texto} | "
-                                f"Residente: {residente} (Apto {apartamento}) | Placa: {placa}")
+                                f" {residente_texto}  {apartamento_texto} | Placa: {placa}")
                     
                     lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
                                   bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
@@ -1798,9 +1808,9 @@ def main():
         password = input("Password: ")
         
         try:
-            port = int(input("Port [5432]: ") or "5432")
+            port = int(input("Port [5433]: ") or "5433")
         except:
-            port = 5432
+            port = 5433
         
         db_config = {
             'host': host,
