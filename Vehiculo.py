@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Sistema de Control de Acceso Vehicular - PostgreSQL (CORREGIDO: Liquidación funcional + ESTILO MEJORADO + COLORES OPTIMIZADOS)"""
+"""Sistema de Control de Acceso Vehicular - PostgreSQL (CORREGIDO: Liquidación funcional + ESTILO MEJORADO + COLORES OPTIMIZADOS + VISITANTES EN PARQUEADEROS)"""
 
 # =============================================================================
 # INSTALACIÓN DE DEPENDENCIAS (ejecutar en terminal)
@@ -86,7 +86,7 @@ class PostgreSQLManager:
             'database': config.get('database', 'control_acceso'),
             'user': config.get('user', 'postgres'),
             'password': config.get('password', ''),
-            'port': config.get('port', 5433)
+            'port': config.get('port', 5432)
         }
         
         # Intentar conectar
@@ -1589,10 +1589,10 @@ class SistemaControlAccesoPostgreSQL:
         btn_cancelar.pack(fill='x')
     
     def mostrar_estado_parqueaderos(self):
-        """Muestra ventana con estado de todos los parqueaderos"""
+        """Muestra ventana con estado de todos los parqueaderos - VERSIÓN CORREGIDA CON VISITANTES"""
         ventana_estado = tk.Toplevel(self.ventana)
         ventana_estado.title("📊 Estado de Parqueaderos")
-        ventana_estado.geometry("700x600")
+        ventana_estado.geometry("750x650")
         ventana_estado.resizable(True, True)
         ventana_estado.configure(bg='#f5f5f5')
         
@@ -1624,6 +1624,7 @@ class SistemaControlAccesoPostgreSQL:
         scrollbar.pack(side="right", fill="y")
         
         if self.usar_datos_memoria:
+            # MODO MEMORIA
             total_parq_res = len(self.datos_memoria['residentes'])
             total_parq_vis = self.datos_memoria.get('total_parqueaderos_visitantes', 5)
             
@@ -1676,37 +1677,80 @@ class SistemaControlAccesoPostgreSQL:
                 lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
                               bg='#27ae60', fg='white', anchor='w', padx=15, pady=10)
                 lbl.pack(fill='x')
+        
         else:
+            # MODO POSTGRESQL - VERSIÓN CORREGIDA CON VISITANTES
             if self.db and self.db.conectado:
+                # 1. Obtener todos los parqueaderos (residentes)
                 parqueaderos = self.db.obtener_estado_parqueaderos()
                 
+                # 2. Obtener visitantes activos
+                visitantes_activos = self.db.obtener_visitantes_activos()
+                
+                # Crear un diccionario para mapear número de parqueadero -> placa del visitante
+                visitantes_por_parqueadero = {}
+                for v in visitantes_activos:
+                    visitantes_por_parqueadero[v['parqueadero']] = v['placa']
+                
+                # SECCIÓN RESIDENTES
+                lbl_res_header = tk.Label(scrollable_frame, text="👨‍💼 PARQUEADEROS RESIDENTES", 
+                                         font=('Arial', 12, 'bold'), bg='#3498db', fg='white',
+                                         padx=15, pady=10)
+                lbl_res_header.pack(fill='x', pady=(0, 10))
+                
+                # Primero mostrar parqueaderos de residentes (los que tienen residente asignado)
                 for p in parqueaderos:
-                    estado_color = '#27ae60' if p['estado'] == 'LIBRE' else '#e74c3c'
-                    estado_texto = "🟢 LIBRE" if p['estado'] == 'LIBRE' else "🔴 OCUPADO"
-                    
-                    card = tk.Frame(scrollable_frame, bg=estado_color, relief='solid', bd=2)
-                    card.pack(fill='x', pady=5, padx=10)
-                    
-                    residente = p['residente'] 
-                    apartamento = p['apartamento'] if p['apartamento'] else " "
-                    placa = p['placa'] if p['placa'] else " "
-                    
-                    if residente:
-                        residente_texto = f"Residente: {residente}"
-                    else:
-                        residente_texto = "Visitante "
-                    
-                    if apartamento:
-                        apartamento_texto = f"(Apto {apartamento})"
-                    else:
-                        apartamento_texto = " "
-                             
-                    info_text = (f"Parqueadero #{p['numero']} | {estado_texto} | "
-                                f" {residente_texto}  {apartamento_texto} | Placa: {placa}")
-                    
-                    lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
-                                  bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
-                    lbl.pack(fill='x')
+                    if p['residente']:  # Tiene residente asignado
+                        estado_color = '#27ae60' if p['estado'] == 'LIBRE' else '#e74c3c'
+                        estado_texto = "🟢 LIBRE" if p['estado'] == 'LIBRE' else "🔴 OCUPADO"
+                        
+                        card = tk.Frame(scrollable_frame, bg=estado_color, relief='solid', bd=2)
+                        card.pack(fill='x', pady=5, padx=10)
+                        
+                        residente = p['residente'] 
+                        apartamento = p['apartamento'] if p['apartamento'] else ""
+                        placa = p['placa'] if p['placa'] else ""
+                        
+                        info_text = (f"Parqueadero #{p['numero']} | {estado_texto} | "
+                                    f"Residente: {residente} (Apto {apartamento}) | Placa: {placa}")
+                        
+                        lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
+                                      bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
+                        lbl.pack(fill='x')
+                
+                # SECCIÓN VISITANTES
+                lbl_vis_header = tk.Label(scrollable_frame, text="👥 PARQUEADEROS VISITANTES", 
+                                         font=('Arial', 12, 'bold'), bg='#9b59b6', fg='white',
+                                         padx=15, pady=10)
+                lbl_vis_header.pack(fill='x', pady=(15, 10))
+                
+                # Ahora mostrar parqueaderos de visitantes (sin residente asignado)
+                for p in parqueaderos:
+                    if not p['residente']:  # No tiene residente, es parqueadero de visitante
+                        # Verificar si este parqueadero está ocupado por algún visitante
+                        if p['numero'] in visitantes_por_parqueadero:
+                            # OCUPADO por visitante
+                            placa_visitante = visitantes_por_parqueadero[p['numero']]
+                            
+                            card = tk.Frame(scrollable_frame, bg='#f39c12', relief='solid', bd=2)
+                            card.pack(fill='x', pady=5, padx=10)
+                            
+                            info_text = (f"Parqueadero #{p['numero']} | 🔴 OCUPADO | "
+                                        f"Placa: {placa_visitante}")
+                            
+                            lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
+                                          bg='#f39c12', fg='white', anchor='w', padx=15, pady=10)
+                            lbl.pack(fill='x')
+                        else:
+                            # LIBRE
+                            card = tk.Frame(scrollable_frame, bg='#27ae60', relief='solid', bd=2)
+                            card.pack(fill='x', pady=5, padx=10)
+                            
+                            info_text = f"Parqueadero #{p['numero']} | 🟢 LIBRE"
+                            
+                            lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
+                                          bg='#27ae60', fg='white', anchor='w', padx=15, pady=10)
+                            lbl.pack(fill='x')
     
     def mostrar_configuracion(self):
         """Muestra ventana de configuración"""
@@ -1808,9 +1852,9 @@ def main():
         password = input("Password: ")
         
         try:
-            port = int(input("Port [5433]: ") or "5433")
+            port = int(input("Port [5432]: ") or "5432")
         except:
-            port = 5433
+            port = 5432
         
         db_config = {
             'host': host,
