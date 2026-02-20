@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Sistema de Control de Acceso Vehicular - PostgreSQL (CON CAPTURA POR CÁMARA)"""
+"""Sistema de Control de Acceso Vehicular - PostgreSQL (CON CÁMARA Y CARGA DE FOTO)"""
 
 # =============================================================================
 # INSTALACIÓN DE DEPENDENCIAS (ejecutar en terminal)
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageEnhance, ImageFilter
 import io
 import time
 import re
@@ -60,6 +60,268 @@ else:
     print('WARNING: tesseract binary not found. Install Tesseract and/or set the TESSERACT_CMD environment variable.')
     if os.name == 'nt':
         pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# =============================================================================
+# CLASE PARA PROCESAR IMÁGENES Y DETECTAR PLACAS (MEJORADA)
+# =============================================================================
+
+class ProcesadorPlacas:
+    """Clase para procesar imágenes y detectar placas con múltiples métodos"""
+    
+    @staticmethod
+    def preprocesar_imagen(img):
+        """
+        Aplica múltiples preprocesamientos a la imagen para mejorar OCR
+        """
+        resultados = []
+        
+        # Convertir a escala de grises si es necesario
+        if len(img.shape) == 3:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = img.copy()
+        
+        # Método 1: Umbral adaptativo
+        thresh1 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                        cv2.THRESH_BINARY, 11, 2)
+        resultados.append(('adaptive', thresh1))
+        
+        # Método 2: Umbral Otsu
+        _, thresh2 = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        resultados.append(('otsu', thresh2))
+        
+        # Método 3: Ecualización del histograma
+        equ = cv2.equalizeHist(gray)
+        resultados.append(('equalized', equ))
+        
+        # Método 4: Filtro bilateral (reduce ruido, preserva bordes)
+        bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
+        _, thresh3 = cv2.threshold(bilateral, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        resultados.append(('bilateral', thresh3))
+        
+        # Método 5: Aumento de contraste
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        clahe_img = clahe.apply(gray)
+        resultados.append(('clahe', clahe_img))
+        
+        return resultados, gray
+    
+    @staticmethod
+    def detectar_placa_por_contornos(gray):
+        """
+        Detecta posibles regiones de placa por contornos
+        """
+        try:
+            # Aplicar desenfoque para reducir ruido
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            
+            # Detectar bordes
+            edged = cv2.Canny(blurred, 30, 200)
+            
+            # Dilatar para conectar bordes
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+            dilated = cv2.dilate(edged, kernel, iterations=1)
+            
+            # Buscar contornos
+            contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=cv2.contourArea, reverse=True)[:20]
+            
+            placas_encontradas = []
+            
+            for contour in contours:
+                # Aproximar el contorno
+                peri = cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+                
+                # Si tiene 4 lados, podría ser una placa
+                if len(approx) == 4:
+                    # Obtener el área delimitadora
+                    x, y, w, h = cv2.boundingRect(contour)
+                    
+                    # Verificar proporciones (las placas suelen ser rectangulares)
+                    aspect_ratio = w / float(h)
+                    area = w * h
+                    area_total = gray.shape[0] * gray.shape[1]
+                    
+                    # Criterios: proporción entre 2 y 5, área entre 1% y 30% de la imagen total
+                    if 2 < aspect_ratio < 5 and area > 0.01 * area_total and area < 0.3 * area_total:
+                        # Extraer ROI
+                        roi = gray[y:y+h, x:x+w]
+                        
+                        # Asegurar que el ROI no está vacío
+                        if roi.size > 0:
+                            # Redimensionar para mejorar OCR
+                            roi = cv2.resize(roi, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                            
+                            # Aplicar umbral
+                            _, roi = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                            
+                            placas_encontradas.append((roi, (x, y, w, h)))
+            
+            return placas_encontradas
+            
+        except Exception as e:
+            print(f"Error detectando contornos: {e}")
+            return []
+    
+    @staticmethod
+    def aplicar_ocr(imagen):
+        """
+        Aplica OCR a una imagen y retorna el texto detectado
+        """
+        try:
+            # Configuraciones de OCR para probar
+            configuraciones = [
+                '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Palabra única
+                '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Línea única
+                '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',  # Bloque uniforme
+            ]
+            
+            mejores_resultados = []
+            
+            for config in configuraciones:
+                try:
+                    texto = pytesseract.image_to_string(imagen, config=config).strip()
+                    texto = re.sub(r'[^A-Z0-9]', '', texto.upper())
+                    if len(texto) >= 4:
+                        mejores_resultados.append(texto)
+                except:
+                    continue
+            
+            # Si hay resultados, devolver el más largo (probablemente el mejor)
+            if mejores_resultados:
+                return max(mejores_resultados, key=len)
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error en OCR: {e}")
+            return None
+    
+    @staticmethod
+    def procesar_imagen_para_ocr(imagen_path):
+        """
+        Procesa una imagen para mejorar la detección OCR
+        Retorna la placa detectada y la imagen procesada
+        """
+        try:
+            # Cargar imagen
+            if isinstance(imagen_path, str):
+                img = cv2.imread(imagen_path)
+                if img is None:
+                    # Intentar con PIL si OpenCV falla
+                    pil_img = Image.open(imagen_path)
+                    # Convertir a RGB y luego a BGR para OpenCV
+                    img = np.array(pil_img.convert('RGB'))
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            else:
+                img = imagen_path
+            
+            # Guardar imagen original para visualización
+            img_original = img.copy()
+            
+            # Aplicar múltiples preprocesamientos
+            imagenes_procesadas, gray = ProcesadorPlacas.preprocesar_imagen(img)
+            
+            # Intentar detectar por contornos primero
+            posibles_placas = ProcesadorPlacas.detectar_placa_por_contornos(gray)
+            
+            todas_las_detecciones = []
+            
+            # Procesar cada posible placa encontrada por contornos
+            for roi, bbox in posibles_placas:
+                texto = ProcesadorPlacas.aplicar_ocr(roi)
+                if texto:
+                    todas_las_detecciones.append((texto, len(texto)))
+                    
+                    # Dibujar rectángulo en la imagen original
+                    x, y, w, h = bbox
+                    cv2.rectangle(img_original, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                    cv2.putText(img_original, texto, (x, y-10), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            
+            # Si no se detectó por contornos, probar OCR en toda la imagen
+            if not todas_las_detecciones:
+                for nombre, img_proc in imagenes_procesadas:
+                    texto = ProcesadorPlacas.aplicar_ocr(img_proc)
+                    if texto:
+                        todas_las_detecciones.append((texto, len(texto)))
+            
+            # Seleccionar la mejor detección (la más larga y con formato de placa)
+            mejor_placa = None
+            if todas_las_detecciones:
+                # Ordenar por longitud (las más largas primero)
+                todas_las_detecciones.sort(key=lambda x: x[1], reverse=True)
+                
+                # Buscar la que tenga formato de placa (3 letras + números)
+                for placa, _ in todas_las_detecciones:
+                    if re.match(r'[A-Z]{3}\d{3,4}', placa):
+                        mejor_placa = placa
+                        break
+                
+                # Si no hay con formato, tomar la más larga
+                if not mejor_placa:
+                    mejor_placa = todas_las_detecciones[0][0]
+            
+            return mejor_placa, img_original
+            
+        except Exception as e:
+            print(f"Error procesando imagen: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, None
+    
+    @staticmethod
+    def mostrar_imagen_procesada(imagen, placa_detectada, parent):
+        """Muestra la imagen procesada en una ventana"""
+        ventana_img = tk.Toplevel(parent)
+        ventana_img.title("📸 Imagen Procesada")
+        ventana_img.geometry("900x700")
+        ventana_img.configure(bg='#2c3e50')
+        
+        # Frame superior
+        top_frame = tk.Frame(ventana_img, bg='#3498db', height=80)
+        top_frame.pack(fill='x')
+        top_frame.pack_propagate(False)
+        
+        tk.Label(top_frame, text=f"PLACA DETECTADA: {placa_detectada}", 
+                font=('Arial', 18, 'bold'), bg='#3498db', fg='white').pack(expand=True)
+        
+        # Frame para la imagen
+        img_frame = tk.Frame(ventana_img, bg='white', relief='solid', bd=2)
+        img_frame.pack(expand=True, fill='both', padx=20, pady=20)
+        
+        # Convertir imagen para mostrar
+        if len(imagen.shape) == 3:
+            img_rgb = cv2.cvtColor(imagen, cv2.COLOR_BGR2RGB)
+        else:
+            img_rgb = cv2.cvtColor(imagen, cv2.COLOR_GRAY2RGB)
+            
+        img_pil = Image.fromarray(img_rgb)
+        
+        # Redimensionar manteniendo aspecto
+        img_pil.thumbnail((800, 500), Image.Resampling.LANCZOS)
+        
+        img_tk = ImageTk.PhotoImage(img_pil)
+        
+        # Mostrar imagen
+        img_label = tk.Label(img_frame, image=img_tk, bg='white')
+        img_label.image = img_tk
+        img_label.pack(expand=True)
+        
+        # Frame de botones
+        btn_frame = tk.Frame(ventana_img, bg='#2c3e50')
+        btn_frame.pack(fill='x', pady=10)
+        
+        tk.Button(btn_frame, text="✅ Aceptar y Usar", 
+                 command=lambda: [ventana_img.destroy(), parent.focus_force()],
+                 bg='#27ae60', fg='white', font=('Arial', 11, 'bold'),
+                 padx=20, pady=8, cursor='hand2').pack(side='left', expand=True, padx=5)
+        
+        tk.Button(btn_frame, text="❌ Cerrar", 
+                 command=ventana_img.destroy,
+                 bg='#e74c3c', fg='white', font=('Arial', 11, 'bold'),
+                 padx=20, pady=8, cursor='hand2').pack(side='left', expand=True, padx=5)
 
 # =============================================================================
 # CLASE PARA CAPTURA DE CÁMARA Y RECONOCIMIENTO DE PLACAS
@@ -118,7 +380,6 @@ class CapturadorPlaca:
         scrollbar.pack(side="right", fill="y")
 
         main_frame = scrollable_frame
-
     
         # Frame para el video
         self.video_frame = tk.Frame(main_frame, bg='black', width=640, height=480)
@@ -209,10 +470,8 @@ class CapturadorPlaca:
                 self.video_label.image = img_tk
             
             # Programar siguiente actualización
-
             if self.capturando:
                 self.ventana_cam.after(30, self.actualizar_video)
-
     
     def capturar_y_reconocer(self):
         """Captura el frame actual y reconoce la placa"""
@@ -224,91 +483,23 @@ class CapturadorPlaca:
             messagebox.showerror("Error", "No se pudo capturar la imagen")
             return
         
-        # Procesar imagen para OCR
-        placa = self.reconocer_placa(frame)
+        # Usar el procesador mejorado
+        placa, imagen_procesada = ProcesadorPlacas.procesar_imagen_para_ocr(frame)
         
         if placa:
             self.placa_detectada = placa
             self.label_placa_detectada.config(text=placa, fg='#27ae60')
             self.btn_aceptar.config(state='normal')
             
-            # Mostrar mensaje de éxito
+            # Mostrar imagen procesada si está disponible
+            if imagen_procesada is not None:
+                ProcesadorPlacas.mostrar_imagen_procesada(imagen_procesada, placa, self.ventana_cam)
+            
             messagebox.showinfo("Placa Detectada", f"✅ Placa detectada: {placa}")
         else:
             self.label_placa_detectada.config(text="No se pudo detectar", fg='#e74c3c')
             self.btn_aceptar.config(state='disabled')
             messagebox.showwarning("Sin Detección", "No se pudo detectar una placa válida. Intente de nuevo con mejor iluminación.")
-    
-    def reconocer_placa(self, frame):
-        """
-        Reconoce la placa en el frame usando OCR
-        Retorna la placa detectada o None
-        """
-        try:
-            # Convertir a escala de grises
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            
-            # Aplicar filtros para mejorar OCR
-            gray = cv2.bilateralFilter(gray, 11, 17, 17)
-            
-            # Detectar bordes
-            edged = cv2.Canny(gray, 30, 200)
-            
-            # Buscar contornos
-            contours, _ = cv2.findContours(edged, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # Ordenar contornos por área (mayor primero)
-            contours = sorted(contours, key=cv2.contourArea, reverse=True)[:10]
-            
-            placa_detectada = None
-            
-            # Buscar posibles áreas de placa
-            for contour in contours:
-                # Aproximar el contorno
-                peri = cv2.arcLength(contour, True)
-                approx = cv2.approxPolyDP(contour, 0.018 * peri, True)
-                
-                # Si tiene 4 lados, podría ser una placa
-                if len(approx) == 4:
-                    # Obtener el área delimitadora
-                    x, y, w, h = cv2.boundingRect(contour)
-                    
-                    # Verificar proporciones (las placas suelen ser rectangulares)
-                    aspect_ratio = w / float(h)
-                    if 2 < aspect_ratio < 5:  # Rango típico para placas
-                        # Extraer ROI
-                        roi = gray[y:y+h, x:x+w]
-                        
-                        # Preprocesar ROI
-                        roi = cv2.threshold(roi, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-                        
-                        # Aplicar OCR
-                        config = '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                        texto = pytesseract.image_to_string(roi, config=config).strip()
-                        
-                        # Limpiar texto (solo alfanumérico)
-                        texto_limpio = re.sub(r'[^A-Z0-9]', '', texto.upper())
-                        
-                        # Verificar formato típico de placa (3 letras + 3 números o similar)
-                        if len(texto_limpio) >= 5 and len(texto_limpio) <= 8:
-                            placa_detectada = texto_limpio
-                            break
-            
-            # Si no se detectó por contornos, intentar OCR en toda la imagen
-            if not placa_detectada:
-                config = '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-                texto = pytesseract.image_to_string(gray, config=config).strip()
-                
-                # Buscar patrones de placa
-                patrones = re.findall(r'[A-Z]{3}\d{3,4}', texto.upper())
-                if patrones:
-                    placa_detectada = patrones[0]
-            
-            return placa_detectada
-            
-        except Exception as e:
-            print(f"Error en reconocimiento: {e}")
-            return None
     
     def aceptar_placa(self):
         """Acepta la placa detectada y la envía al callback"""
@@ -1095,7 +1286,7 @@ class SistemaControlAccesoPostgreSQL:
         tk.Label(contenedor, text="🔍 BÚSQUEDA DE VEHÍCULOS", 
                 font=('Arial', 12, 'bold'), bg='white', fg=color_primario).pack(anchor='w', pady=(0, 10))
         
-        # Fila de entrada de placa - CON BOTÓN DE CÁMARA
+        # Fila de entrada de placa - CON BOTÓN DE CÁMARA Y CARGA DE FOTO
         entrada_frame = tk.Frame(contenedor, bg='white')
         entrada_frame.pack(fill='x', pady=5)
         
@@ -1121,13 +1312,21 @@ class SistemaControlAccesoPostgreSQL:
                                activebackground='#c0392b', cursor='hand2')
         btn_limpiar.pack(side='left', padx=5)
         
-        # NUEVO: Botón para capturar con cámara
+        # Botón para capturar con cámara
         btn_camara = tk.Button(entrada_frame, text="📸 Capturar con Cámara", 
                               command=self.abrir_capturador,
                               bg='#9b59b6', fg='white', font=('Arial', 9, 'bold'),
                               relief='flat', bd=0, padx=15, pady=5,
                               activebackground='#8e44ad', cursor='hand2')
         btn_camara.pack(side='left', padx=5)
+        
+        # NUEVO: Botón para cargar foto desde archivo
+        btn_cargar_foto = tk.Button(entrada_frame, text="📷 Cargar Foto", 
+                                   command=self.cargar_foto_desde_archivo,
+                                   bg='#8e44ad', fg='white', font=('Arial', 9, 'bold'),
+                                   relief='flat', bd=0, padx=15, pady=5,
+                                   activebackground='#7d3c98', cursor='hand2')
+        btn_cargar_foto.pack(side='left', padx=5)
         
         # Separador
         ttk.Separator(contenedor, orient='horizontal').pack(fill='x', pady=10)
@@ -1184,8 +1383,53 @@ class SistemaControlAccesoPostgreSQL:
         """Callback que recibe la placa capturada y la coloca en el campo de texto"""
         self.entry_placa.delete(0, tk.END)
         self.entry_placa.insert(0, placa)
-        # Opcional: buscar automáticamente después de capturar
+        # Buscar automáticamente después de capturar
         self.buscar_placa_entrada()
+    
+    def cargar_foto_desde_archivo(self):
+        """Abre diálogo para cargar una foto desde archivo y detecta la placa"""
+        # Abrir diálogo para seleccionar archivo
+        file_path = filedialog.askopenfilename(
+            title="Seleccionar imagen de la placa",
+            filetypes=[
+                ("Imágenes", "*.jpg *.jpeg *.png *.bmp *.gif *.tiff"),
+                ("Todos los archivos", "*.*")
+            ]
+        )
+        
+        if not file_path:
+            return
+        
+        # Mostrar mensaje de procesamiento
+        mensaje = messagebox.showinfo("Procesando", "Procesando imagen y detectando placa...\nPor favor espere.")
+        
+        try:
+            # Procesar imagen y detectar placa usando el procesador mejorado
+            placa_detectada, imagen_procesada = ProcesadorPlacas.procesar_imagen_para_ocr(file_path)
+            
+            if not placa_detectada:
+                messagebox.showwarning("Sin detección", 
+                                      "No se pudo detectar una placa en la imagen.\n\n"
+                                      "Consejos:\n"
+                                      "• Use una imagen con buena iluminación\n"
+                                      "• La placa debe estar centrada y enfocada\n"
+                                      "• Evite imágenes borrosas\n"
+                                      "• Asegúrese que la placa sea legible")
+                return
+            
+            # Mostrar la imagen con la placa detectada
+            if imagen_procesada is not None:
+                ProcesadorPlacas.mostrar_imagen_procesada(imagen_procesada, placa_detectada, self.ventana)
+            
+            # Colocar la placa en el campo de texto
+            self.entry_placa.delete(0, tk.END)
+            self.entry_placa.insert(0, placa_detectada)
+            
+            # AUTOMÁTICAMENTE verificar si es residente o visitante
+            self.verificar_y_mostrar_tipo(placa_detectada)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error procesando imagen:\n{str(e)}")
     
     def crear_panel_resultados(self, parent):
         """Crea el panel de resultados con mejor contraste y formato"""
@@ -1214,7 +1458,7 @@ class SistemaControlAccesoPostgreSQL:
         
         self.label_resultado_placa = tk.Label(
             self.panel_resultado_placa, 
-            text="📝 Ingrese una placa y presione 'Buscar' o use la cámara", 
+            text="📝 Ingrese una placa, use la cámara o cargue una foto", 
             font=('Arial', 14), 
             bg='#ffffff', 
             fg='#34495e',  # Azul grisáceo oscuro para mejor contraste
@@ -1275,7 +1519,7 @@ class SistemaControlAccesoPostgreSQL:
         
         # Copyright
         copyright_label = tk.Label(footer_frame,
-                                  text="© 2024 Sistema Control Vehicular | Versión 2.0 PostgreSQL",
+                                  text="© 2024 Sistema Control Vehicular | Versión 3.0 PostgreSQL",
                                   font=('Arial', 8),
                                   bg=color_primario,
                                   fg='#95a5a6')
@@ -1287,7 +1531,7 @@ class SistemaControlAccesoPostgreSQL:
         
         if not placa:
             self.label_resultado_placa.config(
-                text="⚠️ POR FAVOR INGRESE UNA PLACA\n\nUse el teclado o la cámara para capturarla", 
+                text="⚠️ POR FAVOR INGRESE UNA PLACA\n\nUse el teclado, la cámara o cargue una foto", 
                 fg='#c0392b',  # Rojo más oscuro para mejor contraste
                 font=('Arial', 14, 'bold'),
                 justify='center'
@@ -1295,97 +1539,82 @@ class SistemaControlAccesoPostgreSQL:
             self.panel_resultado_placa.config(bg='#fdedec')  # Rojo muy claro
             return
         
+        self.verificar_y_mostrar_tipo(placa)
+    
+    def verificar_y_mostrar_tipo(self, placa):
+        """Verifica si la placa es residente o visitante y muestra el resultado"""
         try:
             if self.usar_datos_memoria:
-                # Buscar en datos de memoria
                 if placa in self.datos_memoria['residentes']:
                     residente = self.datos_memoria['residentes'][placa]
                     estado_visual = "🟢 LIBRE" if residente['estado'].lower() == 'libre' else "🔴 OCUPADO"
-                    texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n\n"
-                            f"┌─────────────────────────┐\n"
-                            f"│ Nombre: {residente['nombre']:<20} │\n"
-                            f"│ Apartamento: {residente['apartamento']:<14} │\n"
-                            f"│ Parqueadero: {residente['parqueadero']:<14} │\n"
-                            f"│ Estado: {estado_visual:<18} │\n"
-                            f"└─────────────────────────┘")
+                    texto = (f"✅ RESIDENTE IDENTIFICADO\n\n"
+                            f"Nombre: {residente['nombre']}\n"
+                            f"Apartamento: {residente['apartamento']}\n"
+                            f"Parqueadero: {residente['parqueadero']}\n"
+                            f"Estado: {estado_visual}")
                     self.label_resultado_placa.config(
                         text=texto, 
-                        fg='#1e3c2c',  # Verde oscuro para mejor contraste
+                        fg='#1e3c2c',
                         font=('Arial', 12),
                         justify='left'
                     )
-                    self.panel_resultado_placa.config(bg='#d4edda')  # Verde muy claro
+                    self.panel_resultado_placa.config(bg='#d4edda')
                 else:
                     # Verificar si es visitante activo
                     if placa in self.datos_memoria['visitantes_activos']:
                         datos = self.datos_memoria['visitantes_activos'][placa]
                         tiempo = datetime.now() - datos['hora_entrada']
                         horas = tiempo.total_seconds() / 3600
-                        texto = (f"👥 VISITANTE ACTIVO\n\n"
-                                f"┌─────────────────────────┐\n"
-                                f"│ Placa: {placa:<21} │\n"
-                                f"│ Parqueadero: {datos['parqueadero']:<15} │\n"
-                                f"│ Tiempo: {horas:.1f} horas{' ':<9} │\n"
-                                f"└─────────────────────────┘")
+                        texto = (f"✅ VISITANTE ACTIVO\n\n"
+                                f"Parqueadero: {datos['parqueadero']}\n"
+                                f"Tiempo: {horas:.1f} horas")
                     else:
-                        texto = (f"👥 VISITANTE NO REGISTRADO\n\n"
-                                f"┌─────────────────────────┐\n"
-                                f"│ Placa: {placa:<21} │\n"
-                                f"│ Acción: Use 'ENTRADA VISITANTE' │\n"
-                                f"└─────────────────────────┘")
+                        texto = (f"✅ VISITANTE NO REGISTRADO\n\n"
+                                f"Use 'ENTRADA VISITANTE' para registrar.")
                     
                     self.label_resultado_placa.config(
                         text=texto, 
-                        fg='#7b4a1e',  # Marrón oscuro para mejor contraste
+                        fg='#7b4a1e',
                         font=('Arial', 12),
                         justify='left'
                     )
-                    self.panel_resultado_placa.config(bg='#fff3cd')  # Amarillo claro
+                    self.panel_resultado_placa.config(bg='#fff3cd')
             else:
-                # Buscar en PostgreSQL
+                # Modo PostgreSQL
                 if self.db and self.db.conectado:
                     residente = self.db.verificar_placa_residente(placa)
                     
                     if residente:
-                        estado_color_texto = '#1e3c2c' if residente['estado'] == 'LIBRE' else '#7a1f1f'
-                        texto = (f"👨‍💼 RESIDENTE IDENTIFICADO\n\n"
-                                f"┌─────────────────────────┐\n"
-                                f"│ Nombre: {residente['nombre']:<20} │\n"
-                                f"│ Apartamento: {residente['apartamento']:<14} │\n"
-                                f"│ Parqueadero: {residente['parqueadero']:<14} │\n"
-                                f"│ Estado: {residente['estado']:<20} │\n"
-                                f"└─────────────────────────┘")
+                        texto = (f"✅ RESIDENTE IDENTIFICADO\n\n"
+                                f"Nombre: {residente['nombre']}\n"
+                                f"Apartamento: {residente['apartamento']}\n"
+                                f"Parqueadero: {residente['parqueadero']}\n"
+                                f"Estado: {residente['estado']}")
                         self.label_resultado_placa.config(
                             text=texto, 
-                            fg=estado_color_texto,
+                            fg='#1e3c2c',
                             font=('Arial', 12),
                             justify='left'
                         )
-                        self.panel_resultado_placa.config(
-                            bg='#d4edda' if residente['estado'] == 'LIBRE' else '#f8d7da'
-                        )
+                        bg = '#d4edda' if residente['estado'] == 'LIBRE' else '#f8d7da'
+                        self.panel_resultado_placa.config(bg=bg)
                     else:
                         # Verificar si es visitante activo
                         visitante = self.db.obtener_visitante_activo_por_placa(placa)
                         if visitante:
                             hora_entrada = visitante['hora_entrada']
                             if hasattr(hora_entrada, 'strftime'):
-                                hora_str = hora_entrada.strftime('%H:%M:%S')
+                                hora_str = hora_entrada.strftime('%H:%M')
                             else:
                                 hora_str = str(hora_entrada)
                             
-                            texto = (f"👥 VISITANTE ACTIVO\n\n"
-                                    f"┌─────────────────────────┐\n"
-                                    f"│ Placa: {placa:<21}      │\n"
-                                    f"│ Parqueadero: {visitante['parqueadero']:<15} │\n"
-                                    f"│ Entrada: {hora_str:<19} │\n"
-                                    f"└─────────────────────────┘")
+                            texto = (f"✅ VISITANTE ACTIVO\n\n"
+                                    f"Parqueadero: {visitante['parqueadero']}\n"
+                                    f"Entrada: {hora_str}")
                         else:
-                            texto = (f"👥 VISITANTE NO REGISTRADO\n\n"
-                                    f"┌─────────────────────────┐\n"
-                                    f"│ Placa: {placa:<21} │\n"
-                                    f"│ Acción: Use 'ENTRADA VISITANTE' │\n"
-                                    f"└─────────────────────────┘")
+                            texto = (f"✅ VISITANTE NO REGISTRADO\n\n"
+                                    f"Use 'ENTRADA VISITANTE' para registrar.")
                         
                         self.label_resultado_placa.config(
                             text=texto, 
@@ -1402,6 +1631,7 @@ class SistemaControlAccesoPostgreSQL:
                         justify='center'
                     )
                     self.panel_resultado_placa.config(bg='#f8d7da')
+                    
         except Exception as e:
             self.label_resultado_placa.config(
                 text=f"❌ ERROR\n\n{str(e)}", 
@@ -1457,7 +1687,7 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar' o use la cámara", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.label_resultado_placa.config(text="📝 Ingrese una placa, use la cámara o cargue una foto", fg='#34495e', bg='#ffffff', font=('Arial', 14))
             self.panel_resultado_placa.config(bg='#ffffff')
             self.actualizar_estadisticas()
             
@@ -1530,7 +1760,7 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar' o use la cámara", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.label_resultado_placa.config(text="📝 Ingrese una placa, use la cámara o cargue una foto", fg='#34495e', bg='#ffffff', font=('Arial', 14))
             self.panel_resultado_placa.config(bg='#ffffff')
             self.actualizar_estadisticas()
             
@@ -1583,7 +1813,7 @@ class SistemaControlAccesoPostgreSQL:
             
             # Limpiar y actualizar
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar' o use la cámara", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.label_resultado_placa.config(text="📝 Ingrese una placa, use la cámara o cargue una foto", fg='#34495e', bg='#ffffff', font=('Arial', 14))
             self.panel_resultado_placa.config(bg='#ffffff')
             self.actualizar_estadisticas()
             
@@ -1591,7 +1821,7 @@ class SistemaControlAccesoPostgreSQL:
             messagebox.showerror("Error", f"Error al registrar salida: {str(e)}")
     
     def abrir_ventana_liquidar(self):
-        """Abre ventana para liquidar pago de visitante (SALIDA CON PAGO) - CORREGIDA"""
+        """Abre ventana para liquidar pago de visitante (SALIDA CON PAGO)"""
         placa_inicial = self.entry_placa.get().upper().strip()
         
         ventana_liq = tk.Toplevel(self.ventana)
@@ -1853,7 +2083,7 @@ class SistemaControlAccesoPostgreSQL:
             # Actualizar vistas después de cerrar
             self.actualizar_estadisticas()
             self.entry_placa.delete(0, tk.END)
-            self.label_resultado_placa.config(text="📝 Ingrese una placa y presione 'Buscar' o use la cámara", fg='#34495e', bg='#ffffff', font=('Arial', 14))
+            self.label_resultado_placa.config(text="📝 Ingrese una placa, use la cámara o cargue una foto", fg='#34495e', bg='#ffffff', font=('Arial', 14))
             self.panel_resultado_placa.config(bg='#ffffff')
         
         btn_liquidar = tk.Button(btn_frame, text="✅ CONFIRMAR PAGO Y SALIDA", 
@@ -2054,18 +2284,19 @@ class SistemaControlAccesoPostgreSQL:
         """Muestra el manual de usuario"""
         messagebox.showinfo("Manual de Usuario", 
                            "Manual de uso:\n\n"
-                           "1. Ingrese la placa en el campo superior\n"
-                           "2. O use el botón '📸 Capturar con Cámara' para tomar una foto\n"
-                           "3. Presione 'Buscar' para verificar\n"
-                           "4. Use los botones de acción según corresponda\n"
-                           "5. Las estadísticas se actualizan automáticamente")
+                           "1. Ingrese la placa manualmente\n"
+                           "2. Use '📸 Capturar con Cámara' para tomar una foto\n"
+                           "3. Use '📷 Cargar Foto' para seleccionar una imagen\n"
+                           "4. Presione 'Buscar' para verificar\n"
+                           "5. Use los botones de acción según corresponda\n"
+                           "6. Las estadísticas se actualizan automáticamente")
     
     def mostrar_acerca_de(self):
         """Muestra información acerca de la aplicación"""
         messagebox.showinfo("Acerca de", 
                            "🚗 Sistema de Control de Acceso Vehicular\n"
                            "Versión 3.0 PostgreSQL\n"
-                           "Con captura de placas por cámara\n\n"
+                           "Con captura de placas por cámara y carga de fotos\n\n"
                            "© 2024 Conjunto Residencial 'Los Alamos'\n"
                            "Desarrollado con Python y Tkinter")
     
@@ -2123,7 +2354,7 @@ def main():
     """Función principal para ejecutar la aplicación"""
     print("="*70)
     print("🚗 SISTEMA DE CONTROL DE ACCESO VEHICULAR - VERSIÓN POSTGRESQL")
-    print("Con captura de placas por cámara")
+    print("Con captura de placas por cámara y carga de fotos")
     print("="*70)
     
     print("\nConfiguración de conexión PostgreSQL:")
