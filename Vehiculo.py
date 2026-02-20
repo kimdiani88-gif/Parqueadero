@@ -1641,7 +1641,7 @@ class SistemaControlAccesoPostgreSQL:
                 card.pack(fill='x', pady=5, padx=10)
                 
                 info_text = (f"Parqueadero #{datos['parqueadero']} | {estado_texto} | "
-                            f"Residente: {datos['nombre']} (Apto {datos['apartamento']}) | Placa: {datos['placa']}")
+                            f"Residente: {datos['nombre']} (Apto {datos['apartamento']}) | Placa: {placa}")
                 
                 lbl = tk.Label(card, text=info_text, font=('Arial', 10), 
                               bg=estado_color, fg='white', anchor='w', padx=15, pady=10)
